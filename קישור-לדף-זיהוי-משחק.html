@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>זיהוי באמצעות משחק - מערכת זיהוי ביומטרי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D0F10; 
+            --card-bg: #1A1C1E; 
+            --input-bg: #2a2d30;
+            --accent-color: #03dac6; 
+            --accent-color-hover: #7fffd4; 
+            --border-color-base: #282a2c; 
+            --text-color-primary: #e8eaed; 
+            --text-color-secondary: #9aa0a6; 
+            --button-text-color: #0a0a0a;
+            --success-color: #38A169; 
+            --error-color: #E53E3E;   
+            --info-color: #00aeff; 
+            --game-area-bg: #101214; 
+            --ball-color-level3: #ff6b6b; 
+            --ball-color-level2: #feca57;
+            --ball-color-level1: #48dbfb;
+            --ball-color-level0: #1dd1a1; 
+            --bullet-color: var(--accent-color);
+            --shooter-color: var(--accent-color);
+            --card-radius: 10px;
+            --spacing-unit: 14px; /* הוקטן מעט */
+            --shadow-base: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        html { 
+            height: 100%; 
+            overflow: hidden; 
+        }
+        body { 
+            height: 100%; 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: var(--font-primary); background-color: var(--bg-color); color: var(--text-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            padding: var(--spacing-unit); 
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+
+
+        .app-container {
+            width: 100%; max-width: 780px; /* הוקטן מעט */
+            background-color: var(--card-bg);
+            padding: calc(var(--spacing-unit) * 1.2); /* הוקטן מעט */
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-base);
+            border: 1px solid var(--border-color-base);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - (var(--spacing-unit) * 1.5)); /* הותאם */
+            overflow: hidden; 
+            position: relative;
+        }
+
+        header { text-align: center; margin-bottom: calc(var(--spacing-unit)*0.8); flex-shrink: 0; } /* הוקטן רווח */
+        header h1 { font-size: 1.7em; font-weight: 600; margin: 0; } /* הוקטן מעט */
+        .back-link {
+            position: absolute; top: var(--spacing-unit); right: var(--spacing-unit); /* הותאם ל-spacing-unit */
+            font-size: 0.8em; color: var(--accent-color); text-decoration: none;
+            font-weight: 500; transition: color 0.2s ease; display: flex; align-items: center;
+        }
+        .back-link:hover { color: var(--accent-color-hover); }
+        .back-link svg { width: 14px; height: 14px; margin-left: calc(var(--spacing-unit) * 0.4); fill: currentColor;}
+
+        .main-content {
+            flex-grow: 1; 
+            display: flex; flex-direction: column; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.3); gap: calc(var(--spacing-unit)*0.8); /* הוקטנו */
+            overflow-y: auto; 
+        }
+
+        .game-module-section {
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.6); width: 100%; max-width: 480px; /* הוקטן מעט */
+            flex-shrink: 0; 
+        }
+        
+        #instructionTextGame {
+            font-size: 0.9em; color: var(--text-color-secondary); margin-bottom: calc(var(--spacing-unit) * 0.3); /* הוקטנו */
+            text-align: center; min-height: 2em; 
+            flex-shrink: 0;
+        }
+        #instructionTextGame strong { color: var(--accent-color); }
+
+        #gameArea {
+            width: 100%; 
+            height: 320px; /* הוקטן מעט */
+            background-color: var(--game-area-bg);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color-base);
+            margin-bottom: calc(var(--spacing-unit)*0.8); /* הוקטן */
+            position: relative; 
+            overflow: hidden; 
+            flex-shrink: 0;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #statusMessageGame {
+            width: 100%; text-align: center; padding: calc(var(--spacing-unit) * 0.5); /* הוקטן */
+            border-radius: var(--card-radius); font-weight: 500; font-size: 0.8em; /* הוקטן */
+            min-height: calc(var(--spacing-unit) * 1 + 14px); background-color: rgba(0,0,0,0.2);
+            color: var(--text-color-secondary); border: 1px solid transparent;
+            transition: background-color 0.25s ease-out, color 0.25s ease-out, border-color 0.25s ease-out;
+            flex-shrink: 0;
+        }
+        .status-success { background-color: rgba(56, 161, 105, 0.1); color: var(--success-color); border-color: var(--success-color); }
+        .status-error   { background-color: rgba(229, 62, 62, 0.1); color: var(--error-color); border-color: var(--error-color); }
+        .status-info    { background-color: rgba(0, 174, 255, 0.1); color: var(--info-color); border-color: var(--info-color); }
+
+        .actions-area {
+            display: grid; grid-template-columns: 1fr; 
+            gap: var(--spacing-unit); width: 100%; max-width: 680px; /* הוקטן */
+            margin-top: calc(var(--spacing-unit)*0.8); /* הוקטן */
+            flex-shrink: 0;
+        }
+        @media (min-width: 600px) { .actions-area { grid-template-columns: 1fr 1fr; } }
+
+        .action-group {
+            background-color: rgba(255,255,255,0.03); 
+            padding: var(--spacing-unit); /* הוקטן */
+            border-radius: var(--card-radius);
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.6); border: 1px solid var(--border-color-base);
+            min-height: 160px; justify-content: center; /* הוקטן */
+        }
+        .action-group h2 { font-size: 1.1em; font-weight: 600; margin: 0 0 calc(var(--spacing-unit)*0.8) 0; color: var(--text-color-primary); } /* הוקטן */
+        
+        input[type="text"].name-input-game {
+            background-color: var(--input-bg); border: 1px solid var(--border-color-base);
+            color: var(--text-color-primary); border-radius: var(--card-radius);
+            padding: calc(var(--spacing-unit) * 0.6); width: 100%; max-width: 200px; /* הוקטן */
+            text-align: center; font-size: 0.85em; transition: border-color 0.2s ease, box-shadow 0.2s ease; /* הוקטן */
+        }
+        input[type="text"].name-input-game:focus { 
+            outline: none; border-color: var(--accent-color); 
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 20%, transparent);
+        }
+
+        .btn-game {
+            background-color: var(--accent-color); color: var(--button-text-color); border: none;
+            padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 1.5); /* הוקטן */
+            font-size: 0.85em; font-family: var(--font-primary); font-weight: 700; /* הוקטן */
+            border-radius: var(--card-radius); cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            display: inline-flex; align-items: center; justify-content:center; gap: calc(var(--spacing-unit) * 0.4);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            min-width: 180px; /* הוקטן */
+        }
+        .btn-game:hover:not(:disabled) { background-color: var(--accent-color-hover); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn-game:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn-game:disabled { background-color: var(--border-color-base); color: var(--text-color-secondary); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        
+        .results-output-game { font-size: 0.85em; color: var(--text-color-primary); text-align: center; min-height: calc(var(--spacing-unit) * 1.2); margin-top:var(--spacing-unit); } /* הוקטן */
+        .results-output-game strong { color: var(--accent-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <a href="mainPage.html" class="back-link">
+             חזרה <svg viewBox="0 0 20 20"><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+        </a>
+        <header><h1>זיהוי באמצעות משחק</h1></header>
+        
+        <div class="main-content" id="mainContentWrapperGame">
+            <div class="game-module-section">
+                <p id="instructionTextGame">השתמש במקשי החצים (ימינה/שמאלה) לתזוזה, ורווח לירי. המטרה: לפוצץ את כל הכדורים!</p>
+                <div id="gameArea">
+                    <canvas id="gameCanvas"></canvas>
+                </div>
+                <div id="statusMessageGame" class="status-display">המתן להוראות...</div>
+            </div>
+            <div class="actions-area">
+                <div class="action-group">
+                    <h2>הוספה למאגר</h2>
+                    <input type="text" id="personNameGame" class="name-input-game" placeholder="שם מלא">
+                    <button id="startRegistrationButtonGame" class="btn-game">התחל רישום</button>
+                </div>
+                <div class="action-group">
+                    <h2>אימות באמצעות משחק</h2>
+                    <button id="startVerificationButtonGame" class="btn-game">התחל אימות</button>
+                    <div class="results-output-game" id="verificationResultsGame"></div>
+                </div>
+            </div>
+        </div> 
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const personNameInput = document.getElementById('personNameGame');
+            const startRegistrationButton = document.getElementById('startRegistrationButtonGame');
+            const startVerificationButton = document.getElementById('startVerificationButtonGame');
+            const statusMessageEl = document.getElementById('statusMessageGame');
+            const verificationResultsEl = document.getElementById('verificationResultsGame');
+            const gameCanvas = document.getElementById('gameCanvas');
+            const gameArea = document.getElementById('gameArea');
+            const gameCtx = gameCanvas.getContext('2d');
+
+            let isGameActive = false;
+            let gameMode = null; 
+            let balls = [];
+            let bullets = [];
+            
+            const shooter = { x: 0, y: 0, width: 35, height: 18, speed: 6 }; // Shooter slightly smaller and slower
+            let keys = {
+                ArrowLeft: false,
+                ArrowRight: false,
+                Space: false,
+                spacePressedRecently: false 
+            };
+
+            let clickTimestamps = []; 
+            let reactionData = []; 
+            let shotsFired = 0;
+            let successfulHits = 0;
+            let gameStartTime, gameEndTime;
+            let animationFrameId;
+
+            let recordedSignatures = [];
+            const FEATURE_VECTOR_SIZE = 7; 
+            const SIMILARITY_THRESHOLD_GAME = 5000; 
+
+            const BALL_LEVELS = 4; 
+            const BALL_RADII = [7, 11, 16, 22]; // Balls slightly smaller
+            const BALL_SPEED_BASE = 1.5; // Reduced base speed
+            const GRAVITY = 0.1; // Reduced gravity
+            const MIN_BOUNCE_VELOCITY = - (BALL_SPEED_BASE * 3.5); // Increased upward bounce force
+            const BULLET_SPEED = 7; // Slightly reduced bullet speed
+            const BULLET_RADIUS = 2.5; // Slightly smaller bullets
+
+            function Ball(x, y, level, dx, initialDy) {
+                this.x = x;
+                this.y = y;
+                this.level = level;
+                this.radius = BALL_RADII[level];
+                this.dx = dx;
+                this.dy = initialDy; 
+                this.id = Math.random().toString(36).substr(2, 9);
+                this.spawnTime = Date.now();
+                
+                const colors = [
+                    getComputedStyle(document.documentElement).getPropertyValue('--ball-color-level0').trim(),
+                    getComputedStyle(document.documentElement).getPropertyValue('--ball-color-level1').trim(),
+                    getComputedStyle(document.documentElement).getPropertyValue('--ball-color-level2').trim(),
+                    getComputedStyle(document.documentElement).getPropertyValue('--ball-color-level3').trim()
+                ];
+                this.color = colors[level];
+
+                this.draw = function() {
+                    gameCtx.beginPath();
+                    gameCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    gameCtx.fillStyle = this.color;
+                    gameCtx.fill();
+                    gameCtx.closePath();
+                }
+
+                this.update = function() {
+                    this.x += this.dx;
+                    if (this.x - this.radius < 0 || this.x + this.radius > gameCanvas.width) {
+                        this.dx *= -1;
+                        this.x = (this.x - this.radius < 0) ? this.radius : gameCanvas.width - this.radius;
+                    }
+
+                    this.dy += GRAVITY; 
+                    this.y += this.dy;
+
+                    if (this.y + this.radius > gameCanvas.height) {
+                        this.y = gameCanvas.height - this.radius; 
+                        this.dy = Math.min(this.dy * -0.8, MIN_BOUNCE_VELOCITY); // Ensure strong bounce from floor
+                    }
+                    if (this.y - this.radius < 0 && this.dy < 0) { 
+                        this.y = this.radius;
+                        this.dy *= -0.6; 
+                    }
+                }
+            }
+
+            function Bullet(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = BULLET_RADIUS;
+                this.color = getComputedStyle(document.documentElement).getPropertyValue('--bullet-color').trim();
+
+                this.draw = function() {
+                    gameCtx.beginPath();
+                    gameCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    gameCtx.fillStyle = this.color;
+                    gameCtx.fill();
+                    gameCtx.closePath();
+                }
+
+                this.update = function() {
+                    this.y -= BULLET_SPEED;
+                }
+            }
+
+            function initializeApp() {
+                showStatusGame('השתמש במקשי החצים (ימינה/שמאלה) לתזוזה, ורווח לירי.', 'info');
+                loadSignaturesFromDBGame();
+                setupCanvas();
+                updateUIStateGame();
+                document.addEventListener('keydown', handleKeyDown);
+                document.addEventListener('keyup', handleKeyUp);
+                window.addEventListener('resize', setupCanvas);
+            }
+
+            function handleKeyDown(event) {
+                if (['ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
+                    keys[event.code] = true;
+                    if (isGameActive) {
+                        event.preventDefault();
+                    }
+                }
+                if (event.code === 'Space' && isGameActive && !keys.spacePressedRecently) {
+                    fireBullet();
+                    keys.spacePressedRecently = true; 
+                }
+            }
+
+            function handleKeyUp(event) {
+                 if (['ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
+                    keys[event.code] = false;
+                }
+                if (event.code === 'Space') {
+                    keys.spacePressedRecently = false;
+                }
+            }
+            
+            function fireBullet() {
+                if (!isGameActive) return;
+                clickTimestamps.push(Date.now()); 
+                shotsFired++;
+                bullets.push(new Bullet(shooter.x, shooter.y - shooter.height / 2));
+            }
+
+
+            function setupCanvas() {
+                gameCanvas.width = gameArea.clientWidth;
+                gameCanvas.height = gameArea.clientHeight;
+                shooter.x = gameCanvas.width / 2;
+                shooter.y = gameCanvas.height - shooter.height / 2 - 10; 
+                clearCanvas();
+                if(!isGameActive) drawInitialState(); 
+            }
+            
+            function drawInitialState() {
+                clearCanvas();
+                drawShooter();
+            }
+
+            function clearCanvas() {
+                gameCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--game-area-bg').trim();
+                gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+            }
+            
+            function drawShooter() {
+                gameCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--shooter-color').trim();
+                gameCtx.beginPath();
+                gameCtx.moveTo(shooter.x, shooter.y - shooter.height / 2); 
+                gameCtx.lineTo(shooter.x - shooter.width / 2, shooter.y + shooter.height / 2); 
+                gameCtx.lineTo(shooter.x + shooter.width / 2, shooter.y + shooter.height / 2); 
+                gameCtx.closePath();
+                gameCtx.fill();
+            }
+
+            function updateShooterPosition() {
+                if (keys.ArrowLeft && shooter.x - shooter.width / 2 > 0) {
+                    shooter.x -= shooter.speed;
+                }
+                if (keys.ArrowRight && shooter.x + shooter.width / 2 < gameCanvas.width) {
+                    shooter.x += shooter.speed;
+                }
+            }
+
+
+            function startGame(mode) {
+                if (isGameActive) return;
+                isGameActive = true;
+                gameMode = mode;
+                
+                balls = [];
+                bullets = [];
+                clickTimestamps = [];
+                reactionData = [];
+                shotsFired = 0;
+                successfulHits = 0;
+                gameStartTime = Date.now();
+
+                spawnInitialBall();
+                updateUIStateGame();
+                showStatusGame('המשחק התחיל! ירה בכדורים.', 'info');
+                verificationResultsEl.innerHTML = '';
+                personNameInput.disabled = true;
+
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                gameLoop();
+            }
+
+            function spawnInitialBall() {
+                const initialLevel = BALL_LEVELS - 1; 
+                const initialRadius = BALL_RADII[initialLevel];
+                const x = gameCanvas.width / 2;
+                const y = initialRadius + 50; 
+                const horizontalSpeed = BALL_SPEED_BASE * (Math.random() > 0.5 ? 1 : -1);
+                const initialVerticalSpeed = MIN_BOUNCE_VELOCITY; // Start with strong upward bounce
+                balls.push(new Ball(x, y, initialLevel, horizontalSpeed, initialVerticalSpeed));
+            }
+            
+            function splitBall(ballIndex) {
+                const ball = balls[ballIndex];
+                if (ball.level > 0) {
+                    const newLevel = ball.level - 1;
+                    const speedMultiplier = 1 + ( (BALL_LEVELS - 1 - newLevel) * 0.15); // Reduced speed increase for smaller balls
+                    
+                    const splitVerticalKick = Math.min(ball.dy * -0.7, MIN_BOUNCE_VELOCITY * (1 + (0.15 * (BALL_LEVELS - 1 - newLevel)) ) );
+                                        
+                    balls.push(new Ball(ball.x, ball.y, newLevel, -Math.abs(ball.dx * 1.05 * speedMultiplier), splitVerticalKick)); 
+                    balls.push(new Ball(ball.x, ball.y, newLevel, Math.abs(ball.dx * 1.05 * speedMultiplier), splitVerticalKick));  
+                }
+                balls.splice(ballIndex, 1);
+            }
+
+            function checkCollisions() {
+                for (let i = bullets.length - 1; i >= 0; i--) {
+                    for (let j = balls.length - 1; j >= 0; j--) {
+                        const bullet = bullets[i];
+                        const ball = balls[j];
+                        if (!bullet || !ball) continue;
+
+                        const dx = bullet.x - ball.x;
+                        const dy = bullet.y - ball.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < bullet.radius + ball.radius) {
+                            successfulHits++;
+                            reactionData.push({ 
+                                ballId: ball.id, 
+                                spawnTime: ball.spawnTime, 
+                                hitTime: Date.now() 
+                            });
+                            splitBall(j);
+                            bullets.splice(i, 1);
+                            break; 
+                        }
+                    }
+                }
+            }
+            
+            function checkShooterCollision() {
+                if (!isGameActive) return;
+                for (let i = 0; i < balls.length; i++) {
+                    const ball = balls[i];
+                    
+                    const shooterLeft = shooter.x - shooter.width / 2;
+                    const shooterRight = shooter.x + shooter.width / 2;
+                    const shooterTop = shooter.y - shooter.height / 2;
+                    const shooterBottom = shooter.y + shooter.height / 2;
+
+                    let closestX = Math.max(shooterLeft, Math.min(ball.x, shooterRight));
+                    let closestY = Math.max(shooterTop, Math.min(ball.y, shooterBottom));
+                    const distanceX = ball.x - closestX;
+                    const distanceY = ball.y - closestY;
+                    const distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+
+                    if (distanceSquared < (ball.radius * ball.radius)) {
+                        if (ball.x > shooterLeft && ball.x < shooterRight &&
+                            ball.y > shooterTop && ball.y < shooterBottom) {
+                           gameOver();
+                           return;
+                        }
+                    }
+                }
+            }
+
+            function gameLoop() {
+                if (!isGameActive && !animationFrameId) return; 
+
+                updateShooterPosition();
+                clearCanvas();
+                drawShooter();
+
+                balls.forEach(ball => { ball.update(); ball.draw(); });
+                
+                for (let i = bullets.length - 1; i >= 0; i--) {
+                    bullets[i].update();
+                    if (bullets[i].y + bullets[i].radius < 0) {
+                        bullets.splice(i, 1);
+                    } else {
+                        bullets[i].draw();
+                    }
+                }
+                checkCollisions(); 
+                checkShooterCollision(); 
+
+                if (isGameActive && balls.length === 0) { 
+                    finishGame(true); 
+                } else if (isGameActive) { 
+                    animationFrameId = requestAnimationFrame(gameLoop);
+                }
+            }
+            
+            function gameOver() { 
+                if (!isGameActive) return;
+                isGameActive = false;
+                
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                
+                showStatusGame('נפסלת! הכדור פגע בך. נסה שוב.', 'error');
+                updateUIStateGame(); 
+                personNameInput.disabled = false;
+                verificationResultsEl.innerHTML = ''; 
+
+                setTimeout(() => { 
+                     balls = []; 
+                     bullets = []; 
+                     drawInitialState(); 
+                }, 1500);
+            }
+
+            function finishGame(isWin) { 
+                if (!isGameActive && isWin) return; 
+                isGameActive = false; 
+                gameEndTime = Date.now();
+
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                
+                updateUIStateGame();
+                personNameInput.disabled = false;
+                
+                if (isWin) { 
+                    const features = extractFeaturesFromGame();
+                    if (!features) {
+                        showStatusGame('ניצחת, אך לא נאספו מספיק נתונים מהמשחק. נסה שוב.', 'error');
+                        drawInitialState(); 
+                        return;
+                    }
+
+                    if (gameMode === 'registration') {
+                        const name = personNameInput.value.trim();
+                        if (recordedSignatures.find(entry => entry.name === name && gameMode === 'registration')) { 
+                             showStatusGame(`שם '${name}' כבר נרשם בסשן זה.`, 'error');
+                             drawInitialState(); return;
+                        }
+                        recordedSignatures.push({ name, features });
+                        saveSignaturesToDBGame();
+                        showStatusGame(`ניצחת! חתימת משחק עבור <strong>${name}</strong> נשמרה.`, 'success');
+                        personNameInput.value = '';
+                    } else if (gameMode === 'verification') {
+                        verifySignatureGame(features);
+                    }
+                } else if (!isWin && gameMode) { 
+                     showStatusGame('המשחק הסתיים.', 'info');
+                }
+                
+                if (isWin || (!isWin && gameMode)) { 
+                    balls = [];
+                    bullets = [];
+                    setTimeout(() => drawInitialState(), isWin ? 500 : 1500); 
+                }
+            }
+
+
+            function extractFeaturesFromGame() {
+                 if (clickTimestamps.length < 2 || reactionData.length < 1) { 
+                    console.warn("Not enough data for features:", 
+                        `Clicks: ${clickTimestamps.length}`, 
+                        `Reactions: ${reactionData.length}`);
+                    return null;
+                }
+
+                const clickIntervals = [];
+                if (clickTimestamps.length > 1) {
+                    for (let i = 1; i < clickTimestamps.length; i++) {
+                        clickIntervals.push(clickTimestamps[i] - clickTimestamps[i-1]);
+                    }
+                }
+                
+                const avgClickInterval = clickIntervals.length > 0 ? clickIntervals.reduce((s, v) => s + v, 0) / clickIntervals.length : 0;
+                const clickIntervalStdDev = clickIntervals.length > 1 ? Math.sqrt(clickIntervals.map(v => Math.pow(v - avgClickInterval, 2)).reduce((s, v) => s + v, 0) / (clickIntervals.length -1)) : 0;
+
+                const reactionTimes = reactionData.map(rd => rd.hitTime - rd.spawnTime).filter(rt => rt > 50 && rt < 5000); 
+                const avgReactionTime = reactionTimes.length > 0 ? reactionTimes.reduce((s, v) => s + v, 0) / reactionTimes.length : 0;
+                const reactionTimeStdDev = reactionTimes.length > 1 ? Math.sqrt(reactionTimes.map(v => Math.pow(v - avgReactionTime, 2)).reduce((s, v) => s + v, 0) / (reactionTimes.length-1)) : 0;
+                
+                const totalDuration = gameEndTime > gameStartTime ? gameEndTime - gameStartTime : 0;
+                const accuracy = shotsFired > 0 ? (successfulHits / shotsFired) : 0;
+
+                return [
+                    avgClickInterval || 0,
+                    clickIntervalStdDev || 0,
+                    avgReactionTime || 0,
+                    reactionTimeStdDev || 0,
+                    totalDuration || 0,
+                    shotsFired || 0,
+                    accuracy || 0
+                ].map(val => parseFloat(val.toFixed(3)));
+            }
+
+            function verifySignatureGame(newFeatures) {
+                if (recordedSignatures.length === 0) {
+                    verificationResultsEl.innerHTML = 'המאגר ריק. יש להוסיף חתימות משחק תחילה.';
+                    showStatusGame('לא ניתן לאמת - מאגר החתימות ריק.', 'info'); return;
+                }
+                let bestMatch = null;
+                let minDistance = Infinity;
+
+                for (const entry of recordedSignatures) {
+                     if (entry.features.length !== newFeatures.length) {
+                        console.warn("Feature vector length mismatch. Skipping:", entry.name);
+                        continue;
+                    }
+                    const distance = euclideanDistanceGame(newFeatures, entry.features);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestMatch = entry;
+                    }
+                }
+                
+                const MAX_DIST_FOR_PERCENTAGE = 20000; 
+                let similarityPercentage = Math.max(0, (1 - (minDistance / MAX_DIST_FOR_PERCENTAGE)) * 100);
+                if(minDistance > MAX_DIST_FOR_PERCENTAGE) similarityPercentage = 0;
+
+
+                if (bestMatch && minDistance < SIMILARITY_THRESHOLD_GAME) { 
+                    verificationResultsEl.innerHTML = `זיהוי הצליח: <strong>${bestMatch.name}</strong> (דמיון: ${similarityPercentage.toFixed(1)}%)`;
+                    showStatusGame('ניצחת! אימות הושלם - זוהתה התאמה.', 'success');
+                } else if (bestMatch) {
+                     verificationResultsEl.innerHTML = `לא זוהתה התאמה ודאית. הקרוב ביותר: ${bestMatch.name} (דמיון: ${similarityPercentage.toFixed(1)}%, מרחק: ${minDistance.toFixed(0)})`;
+                     showStatusGame('ניצחת! אימות הושלם - לא נמצאה התאמה מספקת.', 'info');
+                } else { 
+                    verificationResultsEl.innerHTML = 'לא נמצאה התאמה במאגר (או שגיאת וקטורים).';
+                    showStatusGame('ניצחת! אימות הושלם - לא נמצאה התאמה.', 'info');
+                }
+            }
+            
+            function euclideanDistanceGame(vecA, vecB) {
+                if (!vecA || !vecB || vecA.length !== vecB.length) return Infinity;
+                let sum = 0;
+                for (let i = 0; i < vecA.length; i++) {
+                    sum += Math.pow(((vecA[i] || 0)) - ((vecB[i] || 0)), 2); 
+                }
+                return Math.sqrt(sum);
+            }
+
+            function showStatusGame(message, type = 'info') {
+                statusMessageEl.innerHTML = message;
+                statusMessageEl.className = `status-display status-${type}`;
+            }
+            
+            function updateUIStateGame() {
+                const disableButtons = isGameActive;
+                startRegistrationButton.disabled = disableButtons;
+                startVerificationButton.disabled = disableButtons;
+                personNameInput.disabled = disableButtons;
+
+                if (isGameActive) {
+                    startRegistrationButton.textContent = "משחק פעיל...";
+                    startVerificationButton.textContent = "משחק פעיל...";
+                } else {
+                    startRegistrationButton.textContent = "התחל רישום";
+                    startVerificationButton.textContent = "התחל אימות";
+                }
+            }
+
+            function saveSignaturesToDBGame() {
+                try { localStorage.setItem('gameSignaturesDB_v5', JSON.stringify(recordedSignatures)); } 
+                catch (e) { console.error("Error saving to DB:", e); showStatusGame("שגיאה בשמירה.", "error");}
+            }
+
+            function loadSignaturesFromDBGame() {
+                const data = localStorage.getItem('gameSignaturesDB_v5'); 
+                if (data) {
+                    try {
+                        const parsedData = JSON.parse(data);
+                         if (Array.isArray(parsedData)) {
+                           recordedSignatures = parsedData.filter(entry => 
+                                entry.features && 
+                                Array.isArray(entry.features) && 
+                                entry.features.length === FEATURE_VECTOR_SIZE &&
+                                entry.features.every(f => typeof f === 'number' && !isNaN(f)) 
+                           );
+                        } else { recordedSignatures = []; }
+                    } catch (e) {
+                        console.error("Error parsing data from DB", e);
+                        localStorage.removeItem('gameSignaturesDB_v5'); recordedSignatures = [];
+                    }
+                }
+            }
+            
+            startRegistrationButton.addEventListener('click', () => {
+                if (isGameActive) return;
+                const name = personNameInput.value.trim();
+                if (!name) { showStatusGame('אנא הזן שם.', 'error'); personNameInput.focus(); return; }
+                if (recordedSignatures.find(entry => entry.name === name)) {
+                     showStatusGame(`שם '${name}' כבר קיים. בחר שם אחר.`, 'error'); 
+                     personNameInput.focus(); return;
+                }
+                startGame('registration');
+            });
+            startVerificationButton.addEventListener('click', () => {
+                if (isGameActive) return;
+                startGame('verification');
+            });
+
+            initializeApp();
+        });
+    </script>
+</body>
+</html>

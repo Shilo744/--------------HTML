@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סריקת עין - מערכת זיהוי ביומטרי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- MediaPipe Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D0F10; 
+            --card-bg: #1A1C1E; 
+            --input-bg: #2a2d30;
+            --accent-color: #03dac6; 
+            --accent-color-hover: #7fffd4; 
+            --border-color-base: #282a2c; 
+            --text-color-primary: #e8eaed; 
+            --text-color-secondary: #9aa0a6; 
+            --button-text-color: #0a0a0a;
+            --success-color: #38A169; 
+            --error-color: #E53E3E;   
+            --info-color: #00aeff; 
+            --loader-color: var(--accent-color);
+            --card-radius: 10px;
+            --spacing-unit: 16px; 
+            --shadow-base: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-primary); background-color: var(--bg-color); color: var(--text-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            padding: var(--spacing-unit); 
+        }
+
+        .app-container {
+            width: 100%; max-width: 800px; 
+            background-color: var(--card-bg);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-base);
+            border: 1px solid var(--border-color-base);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - (var(--spacing-unit) * 2)); 
+            position: relative;
+        }
+
+        header { text-align: center; margin-bottom: var(--spacing-unit); flex-shrink: 0; }
+        header h1 { font-size: 1.8em; font-weight: 600; margin: 0; }
+        .back-link {
+            position: absolute; top: calc(var(--spacing-unit)*1.2); right: calc(var(--spacing-unit)*1.2);
+            font-size: 0.8em; color: var(--accent-color); text-decoration: none;
+            font-weight: 500; transition: color 0.2s ease; display: flex; align-items: center;
+        }
+        .back-link:hover { color: var(--accent-color-hover); }
+        .back-link svg { width: 14px; height: 14px; margin-left: calc(var(--spacing-unit) * 0.4); fill: currentColor;}
+
+        .main-content {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.5); gap: var(--spacing-unit);
+        }
+
+        .video-section {
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); width: 100%; max-width: 420px; 
+        }
+        .video-container {
+            position: relative; width: 100%; aspect-ratio: 4 / 3;
+            background-color: #000; border-radius: var(--card-radius); overflow: hidden;
+            border: 2px solid transparent; 
+            box-shadow: var(--shadow-base);
+            transition: border-color 0.3s ease;
+        }
+        .video-container.scan-success {
+            border-color: var(--success-color);
+            box-shadow: 0 0 15px var(--success-color);
+        }
+        #videoFeed, #overlayCanvas { display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        #overlayCanvas { position: absolute; top: 0; left: 0; z-index: 5;}
+        
+        #statusMessage {
+            width: 100%; text-align: center; padding: calc(var(--spacing-unit) * 0.6);
+            border-radius: var(--card-radius); font-weight: 500; font-size: 0.85em;
+            min-height: calc(var(--spacing-unit) * 1.2 + 16px); background-color: rgba(0,0,0,0.2);
+            color: var(--text-color-secondary); border: 1px solid transparent;
+            transition: all 0.2s ease-out;
+        }
+        .status-success { background-color: rgba(56, 161, 105, 0.1); color: var(--success-color); border-color: var(--success-color); }
+        .status-error   { background-color: rgba(229, 62, 62, 0.1); color: var(--error-color); border-color: var(--error-color); }
+        .status-info    { background-color: rgba(0, 174, 255, 0.1); color: var(--info-color); border-color: var(--info-color); }
+
+        .loader-container { display: flex; text-align: center; padding: var(--spacing-unit); position: absolute; top:50%; left:50%; transform: translate(-50%,-50%); z-index: 20; flex-direction:column; align-items:center; }
+        .loader { border: 4px solid rgba(220, 220, 220, 0.15); border-left-color: var(--loader-color); border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto var(--spacing-unit) auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .actions-area { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-unit); width: 100%; max-width: 700px; margin-top: var(--spacing-unit); }
+        .action-group { background-color: rgba(255,255,255,0.03); padding: calc(var(--spacing-unit) * 1.5); border-radius: var(--card-radius); display: flex; flex-direction: column; align-items: center; gap: calc(var(--spacing-unit) * 0.8); border: 1px solid var(--border-color-base); min-height: 180px; justify-content: center; }
+        .action-group h2 { font-size: 1.2em; font-weight: 600; margin: 0 0 var(--spacing-unit) 0; color: var(--text-color-primary); }
+        input[type="text"] { background-color: var(--input-bg); border: 1px solid var(--border-color-base); color: var(--text-color-primary); border-radius: var(--card-radius); padding: calc(var(--spacing-unit) * 0.7); width: 100%; max-width: 220px; text-align: center; font-size: 0.9em; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        input[type="text"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(3, 218, 198, 0.2); }
+        .btn { background-color: var(--accent-color); color: var(--button-text-color); border: none; padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 1.8); font-size: 0.9em; font-family: var(--font-primary); font-weight: 700; border-radius: var(--card-radius); cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--spacing-unit) * 0.5); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:hover:not(:disabled) { background-color: var(--accent-color-hover); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:disabled { background-color: var(--border-color-base); color: var(--text-color-secondary); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        .results-output { font-size: 0.9em; color: var(--text-color-primary); text-align: center; min-height: calc(var(--spacing-unit) * 2.5); margin-top:var(--spacing-unit); }
+        .results-output strong { color: var(--accent-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <a href="mainPage.html" class="back-link">
+             חזרה <svg viewBox="0 0 20 20"><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+        </a>
+        <header><h1>סריקת עין</h1></header>
+
+        <div class="loader-container" id="loaderContainer"><div class="loader"></div><p>טוען מודלים...</p></div>
+        
+        <div class="main-content" id="mainContentWrapper" style="display:none;">
+            <div class="video-section">
+                <div class="video-container" id="videoContainer">
+                    <video id="videoFeed" style="display: none;"></video>
+                    <canvas id="overlayCanvas"></canvas>
+                </div>
+                <div id="statusMessage"></div>
+            </div>
+            <div class="actions-area">
+                <div class="action-group">
+                    <h2>הוספה למאגר</h2>
+                    <input type="text" id="personName" placeholder="שם מלא">
+                    <button id="addEyeButton" class="btn" disabled>הוסף למאגר</button>
+                </div>
+                <div class="action-group">
+                    <h2>אימות</h2>
+                    <button id="verifyEyeButton" class="btn" disabled>בצע אימות</button>
+                    <div class="results-output" id="verificationResults"></div>
+                </div>
+            </div>
+        </div> 
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const videoElement = document.getElementById('videoFeed');
+        const canvasElement = document.getElementById('overlayCanvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const loaderContainer = document.getElementById('loaderContainer');
+        const mainContentWrapper = document.getElementById('mainContentWrapper');
+        const statusMessage = document.getElementById('statusMessage');
+        const videoContainer = document.getElementById('videoContainer');
+        const personNameInput = document.getElementById('personName');
+        const addEyeButton = document.getElementById('addEyeButton');
+        const verifyEyeButton = document.getElementById('verifyEyeButton');
+        const verificationResults = document.getElementById('verificationResults');
+        
+        let latestFaceLandmarks = null;
+        let signaturesDB = [];
+        const SIMILARITY_THRESHOLD = 0.2; 
+        const MAX_EXPECTED_DISTANCE = 0.5;
+        const MIN_EYE_WIDTH_PX = 65; 
+
+        const ALL_LEFT_EYE_INDICES = Array.from(new Set([...FACEMESH_LEFT_EYE.flat(), ...FACEMESH_LEFT_IRIS.flat()]));
+        const LEFT_EYE_OUTER_CORNER = 33;
+        const LEFT_EYE_INNER_CORNER = 133;
+
+        // --- BUG FIX: Added the missing magnitude function ---
+        const vec2 = {
+            magnitude: (v) => Math.sqrt(v.x * v.x + v.y * v.y),
+            dist: (p1, p2) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2)),
+            subtract: (v1, v2) => ({ x: v1.x - v2.x, y: v1.y - v2.y }),
+            normalize: (v) => { 
+                const mag = vec2.magnitude(v); // Now this works
+                return mag === 0 ? {x:0,y:0} : { x: v.x / mag, y: v.y / mag }; 
+            },
+            dot: (v1, v2) => v1.x * v2.x + v1.y * v2.y
+        };
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                const faceLandmarks = results.multiFaceLandmarks[0];
+                latestFaceLandmarks = faceLandmarks;
+                
+                drawConnectors(canvasCtx, faceLandmarks, FACEMESH_LEFT_EYE, {color: '#E0E0E0', lineWidth: 1});
+                drawConnectors(canvasCtx, faceLandmarks, FACEMESH_LEFT_IRIS, {color: '#03dac6', lineWidth: 2});
+                
+                validateScanQuality(faceLandmarks);
+            } else {
+                latestFaceLandmarks = null;
+                showStatus('מקם את פניך מול המצלמה.', 'info');
+                enableActionButtons(false);
+            }
+            canvasCtx.restore();
+        }
+
+        function extractFeatures(landmarks) {
+            const eyeAndIrisLandmarks = ALL_LEFT_EYE_INDICES.map(i => landmarks[i]);
+            const origin = landmarks[LEFT_EYE_OUTER_CORNER];
+            const xAxisRaw = vec2.subtract(landmarks[LEFT_EYE_INNER_CORNER], origin);
+            if (vec2.magnitude(xAxisRaw) === 0) return null;
+            const xAxis = vec2.normalize(xAxisRaw);
+            const yAxis = { x: -xAxis.y, y: xAxis.x };
+            const scale = vec2.magnitude(xAxisRaw);
+            const features = [];
+            for (const landmark of eyeAndIrisLandmarks) {
+                const p = vec2.subtract(landmark, origin);
+                features.push(vec2.dot(p, xAxis) / scale, vec2.dot(p, yAxis) / scale);
+            }
+            return features;
+        }
+
+        function validateScanQuality(landmarks) {
+            const irisCenter = landmarks[473];
+            if (!irisCenter || irisCenter.visibility < 0.8) {
+                showStatus('זיהוי עין לא ודאי, נסה לשפר תאורה.', 'info');
+                enableActionButtons(false);
+                videoContainer.classList.remove('scan-success');
+                return;
+            }
+
+            const outerCornerPx = { x: landmarks[LEFT_EYE_OUTER_CORNER].x * canvasElement.width, y: landmarks[LEFT_EYE_OUTER_CORNER].y * canvasElement.height };
+            const innerCornerPx = { x: landmarks[LEFT_EYE_INNER_CORNER].x * canvasElement.width, y: landmarks[LEFT_EYE_INNER_CORNER].y * canvasElement.height };
+            const eyeWidthPx = vec2.dist(outerCornerPx, innerCornerPx);
+
+            if (eyeWidthPx < MIN_EYE_WIDTH_PX) {
+                const progress = Math.round((eyeWidthPx / MIN_EYE_WIDTH_PX) * 100);
+                showStatus(`התקרב למצלמה (${progress}%)`, 'info');
+                enableActionButtons(false);
+                videoContainer.classList.remove('scan-success');
+                return;
+            }
+            
+            showStatus('סריקה איכותית. ניתן לבצע פעולה.', 'success');
+            videoContainer.classList.add('scan-success');
+            enableActionButtons(true);
+        }
+        
+        function euclideanDistanceSquared(vecA, vecB) {
+            if (!vecA || !vecB || vecA.length !== vecB.length) return Infinity;
+            let sum = 0;
+            for (let i = 0; i < vecA.length; i++) { sum += Math.pow(vecA[i] - vecB[i], 2); }
+            return sum;
+        }
+        
+        function handleAddEye() {
+            const name = personNameInput.value.trim();
+            if (!name) { showStatus('אנא הזן שם.', 'error'); return; }
+            if (signaturesDB.find(entry => entry.name === name)) { showStatus(`השם '${name}' כבר קיים.`, 'error'); return; }
+            if (!latestFaceLandmarks) { showStatus('לא זוהו פנים.', 'error'); return; }
+            const features = extractFeatures(latestFaceLandmarks);
+            if (features) {
+                signaturesDB.push({ name, features });
+                saveSignaturesToDB();
+                showStatus(`חתימת עין עבור <strong>${name}</strong> נשמרה בהצלחה.`, 'success');
+                personNameInput.value = '';
+                verificationResults.innerHTML = '';
+            } else {
+                showStatus('לא ניתן היה לחלץ מאפיינים. נסה שוב.', 'error');
+            }
+        }
+
+        function handleVerifyEye() {
+            if (signaturesDB.length === 0) { showStatus('המאגר ריק. יש להוסיף דגימה תחילה.', 'info'); return; }
+            if (!latestFaceLandmarks) { showStatus('לא זוהו פנים.', 'error'); return; }
+            const featuresToVerify = extractFeatures(latestFaceLandmarks);
+            if (!featuresToVerify) { showStatus('סריקה לא איכותית, נסה שוב.', 'error'); return; }
+            
+            let bestMatch = null;
+            let minDistance = Infinity;
+            for (const entry of signaturesDB) {
+                const distance = euclideanDistanceSquared(featuresToVerify, entry.features);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    bestMatch = entry;
+                }
+            }
+            const similarityPercentage = Math.max(0, (1 - (minDistance / MAX_EXPECTED_DISTANCE)) * 100);
+            if (bestMatch && minDistance < SIMILARITY_THRESHOLD) {
+                verificationResults.innerHTML = `זיהוי הצליח: <strong>${bestMatch.name}</strong><br>(דמיון: ${similarityPercentage.toFixed(1)}%)`;
+                showStatus('אימות הושלם.', 'success');
+            } else {
+                verificationResults.innerHTML = `לא זוהתה התאמה ודאית.<br>הכי קרוב: ${bestMatch ? bestMatch.name : 'לא ידוע'}`;
+                showStatus('אימות נכשל.', 'error');
+            }
+        }
+
+        function showStatus(message, type = 'info') { statusMessage.innerHTML = message; statusMessage.className = `status-display status-${type}`; }
+        function enableActionButtons(enable) {
+            addEyeButton.disabled = !enable;
+            verifyEyeButton.disabled = !enable;
+        }
+        function saveSignaturesToDB() { try { localStorage.setItem('eyeScanDB_final', JSON.stringify(signaturesDB)); } catch (e) { console.error("DB Save Error:", e); } }
+        function loadSignaturesFromDB() { const data = localStorage.getItem('eyeScanDB_final'); if (data) { try { signaturesDB = JSON.parse(data) || []; } catch (e) { signaturesDB = []; } } }
+        
+        loadSignaturesFromDB();
+        const faceMesh = new FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
+        faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        faceMesh.onResults(onResults);
+        
+        const camera = new Camera(videoElement, { onFrame: async () => { await faceMesh.send({ image: videoElement }); }, width: 640, height: 480 });
+        camera.start().then(() => {
+            mainContentWrapper.style.display = 'flex';
+            loaderContainer.style.display = 'none';
+        }).catch(err => {
+            console.error("Camera start failed:", err);
+            loaderContainer.innerHTML = 'שגיאה בהפעלת המצלמה. אנא אשר גישה ורענן את הדף.';
+        });
+        
+        addEyeButton.addEventListener('click', handleAddEye);
+        verifyEyeButton.addEventListener('click', handleVerifyEye);
+    });
+    </script>
+</body>
+</html>

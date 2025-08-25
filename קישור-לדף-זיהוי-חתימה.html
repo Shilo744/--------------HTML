@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>זיהוי חתימה - מערכת זיהוי ביומטרי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* פלטת צבעים עקבית עם הדפים האחרים */
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D0F10; 
+            --card-bg: #1A1C1E; 
+            --input-bg: #2a2d30;
+            --accent-color: #03dac6; 
+            --accent-color-hover: #7fffd4; 
+            --border-color-base: #282a2c; 
+            --text-color-primary: #e8eaed; 
+            --text-color-secondary: #9aa0a6; 
+            --button-text-color: #0a0a0a;
+            --success-color: #38A169; 
+            --error-color: #E53E3E;   
+            --info-color: #00aeff; 
+            --canvas-bg: #101214;
+            --signature-path-color: var(--text-color-primary);
+            --card-radius: 10px;
+            --spacing-unit: 16px; 
+            --shadow-base: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-primary); background-color: var(--bg-color); color: var(--text-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            padding: var(--spacing-unit); 
+        }
+
+        .app-container {
+            width: 100%; max-width: 800px; 
+            background-color: var(--card-bg);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-base);
+            border: 1px solid var(--border-color-base);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - (var(--spacing-unit) * 2)); 
+            position: relative;
+        }
+
+        header { text-align: center; margin-bottom: var(--spacing-unit); flex-shrink: 0; }
+        header h1 { font-size: 1.8em; font-weight: 600; margin: 0; }
+        .back-link {
+            position: absolute; top: calc(var(--spacing-unit)*1.2); right: calc(var(--spacing-unit)*1.2);
+            font-size: 0.8em; color: var(--accent-color); text-decoration: none;
+            font-weight: 500; transition: color 0.2s ease; display: flex; align-items: center;
+        }
+        .back-link:hover { color: var(--accent-color-hover); }
+        .back-link svg { width: 14px; height: 14px; margin-left: calc(var(--spacing-unit) * 0.4); fill: currentColor;}
+
+        .main-content {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.5); gap: var(--spacing-unit);
+        }
+        .main-content::-webkit-scrollbar { width: 5px; }
+        .main-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 3px;}
+        .main-content::-webkit-scrollbar-thumb { background: var(--border-color-base); border-radius: 3px;}
+        .main-content::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+
+        .signature-module-section {
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); width: 100%; max-width: 500px; 
+        }
+        
+        #instructionText {
+            font-size: 0.95em; color: var(--text-color-secondary); margin-bottom: calc(var(--spacing-unit) * 0.5);
+            text-align: center; min-height: 1.5em; 
+        }
+
+        .canvas-container {
+            width: 100%; height: 250px;
+            background-color: var(--canvas-bg);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color-base);
+            margin-bottom: var(--spacing-unit);
+            position: relative; 
+            overflow: hidden; 
+            touch-action: none; /* מונע גלילה בדפדפן בזמן ציור על קנבס במובייל */
+        }
+        #signatureCanvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            cursor: crosshair;
+        }
+        
+        #statusMessage {
+            width: 100%; text-align: center; padding: calc(var(--spacing-unit) * 0.6);
+            border-radius: var(--card-radius); font-weight: 500; font-size: 0.85em;
+            min-height: calc(var(--spacing-unit) * 1.2 + 16px); background-color: rgba(0,0,0,0.2);
+            color: var(--text-color-secondary); border: 1px solid transparent;
+            transition: background-color 0.25s ease-out, color 0.25s ease-out, border-color 0.25s ease-out;
+        }
+        .status-success { background-color: rgba(56, 161, 105, 0.1); color: var(--success-color); border-color: var(--success-color); }
+        .status-error   { background-color: rgba(229, 62, 62, 0.1); color: var(--error-color); border-color: var(--error-color); }
+        .status-info    { background-color: rgba(0, 174, 255, 0.1); color: var(--info-color); border-color: var(--info-color); }
+
+        .actions-area {
+            display: grid; grid-template-columns: 1fr; 
+            gap: var(--spacing-unit); width: 100%; max-width: 700px; 
+            margin-top: var(--spacing-unit);
+        }
+        @media (min-width: 600px) { .actions-area { grid-template-columns: 1fr 1fr; } }
+
+        .action-group {
+            background-color: rgba(255,255,255,0.03); 
+            padding: calc(var(--spacing-unit) * 1.5); border-radius: var(--card-radius);
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); border: 1px solid var(--border-color-base);
+            min-height: 180px; justify-content: center; 
+        }
+        .action-group h2 { font-size: 1.2em; font-weight: 600; margin: 0 0 var(--spacing-unit) 0; color: var(--text-color-primary); }
+        
+        input[type="text"] {
+            background-color: var(--input-bg); border: 1px solid var(--border-color-base);
+            color: var(--text-color-primary); border-radius: var(--card-radius);
+            padding: calc(var(--spacing-unit) * 0.7); width: 100%; max-width: 220px;
+            text-align: center; font-size: 0.9em; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input[type="text"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(3, 218, 198, 0.2); }
+
+        .btn {
+            background-color: var(--accent-color); color: var(--button-text-color); border: none;
+            padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 1.8);
+            font-size: 0.9em; font-family: var(--font-primary); font-weight: 700;
+            border-radius: var(--card-radius); cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            display: inline-flex; align-items: center; justify-content:center; gap: calc(var(--spacing-unit) * 0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            min-width: 200px;
+        }
+        .btn:hover:not(:disabled) { background-color: var(--accent-color-hover); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:disabled { background-color: var(--border-color-base); color: var(--text-color-secondary); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        
+        .btn-secondary {
+            background-color: transparent; color: var(--text-color-secondary);
+            border: 1px solid var(--border-color-base); box-shadow: none;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: rgba(255,255,255,0.05); color: var(--text-color-primary);
+            border-color: var(--text-color-secondary);
+        }
+
+        .results-output { font-size: 0.9em; color: var(--text-color-primary); text-align: center; min-height: calc(var(--spacing-unit) * 2.5); margin-top:var(--spacing-unit); }
+        .results-output strong { color: var(--accent-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <a href="mainPage.html" class="back-link">
+             חזרה <svg viewBox="0 0 20 20"><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+        </a>
+        <header><h1>זיהוי חתימה</h1></header>
+        
+        <div class="main-content" id="mainContentWrapper">
+            <div class="signature-module-section">
+                <p id="instructionText">יש לחתום בתוך התיבה למטה.</p>
+                <div class="canvas-container">
+                    <canvas id="signatureCanvas"></canvas>
+                </div>
+                <button id="clearButton" class="btn btn-secondary" style="min-width: 150px;">נקה לוח</button>
+                <div id="statusMessage" class="status-display">מוכן להתחיל.</div>
+            </div>
+            <div class="actions-area">
+                <div class="action-group">
+                    <h2>הוספה למאגר</h2>
+                    <input type="text" id="personName" placeholder="שם מלא">
+                    <button id="addSignatureButton" class="btn">הוסף חתימה</button>
+                </div>
+                <div class="action-group">
+                    <h2>אימות חתימה</h2>
+                    <button id="verifySignatureButton" class="btn">אמת חתימה</button>
+                    <div class="results-output" id="verificationResults"></div>
+                </div>
+            </div>
+        </div> 
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const canvas = document.getElementById('signatureCanvas');
+            const ctx = canvas.getContext('2d');
+            const personNameInput = document.getElementById('personName');
+            const addSignatureButton = document.getElementById('addSignatureButton');
+            const verifySignatureButton = document.getElementById('verifySignatureButton');
+            const clearButton = document.getElementById('clearButton');
+            const statusMessage = document.getElementById('statusMessage');
+            const verificationResults = document.getElementById('verificationResults');
+            
+            // --- State Variables ---
+            let isDrawing = false;
+            let currentPath = [];
+            let signaturesDB = [];
+            
+            // --- Constants ---
+            const SIMILARITY_THRESHOLD = 2500; // ערך סף לדמיון. יש לכייל לפי הצורך.
+            const MAX_EXPECTED_DISTANCE = 10000; // ערך מקסימלי צפוי למרחק, לצורך חישוב אחוז דמיון
+
+            function initializeApp() {
+                setupCanvas();
+                loadSignaturesFromDB();
+                addEventListeners();
+                showStatus('מוכן. יש לחתום בתיבה.', 'info');
+            }
+
+            function setupCanvas() {
+                const container = canvas.parentElement;
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+                ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--signature-path-color').trim();
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            }
+
+            function addEventListeners() {
+                // Mouse Events
+                canvas.addEventListener('mousedown', startDrawing);
+                canvas.addEventListener('mousemove', draw);
+                canvas.addEventListener('mouseup', stopDrawing);
+                canvas.addEventListener('mouseleave', stopDrawing);
+                // Touch Events
+                canvas.addEventListener('touchstart', startDrawing);
+                canvas.addEventListener('touchmove', draw);
+                canvas.addEventListener('touchend', stopDrawing);
+
+                clearButton.addEventListener('click', clearCanvas);
+                addSignatureButton.addEventListener('click', handleAddSignature);
+                verifySignatureButton.addEventListener('click', handleVerifySignature);
+                window.addEventListener('resize', setupCanvas);
+            }
+
+            function getEventPosition(event) {
+                const rect = canvas.getBoundingClientRect();
+                if (event.touches && event.touches.length > 0) {
+                    return {
+                        x: event.touches[0].clientX - rect.left,
+                        y: event.touches[0].clientY - rect.top
+                    };
+                }
+                return {
+                    x: event.clientX - rect.left,
+                    y: event.clientY - rect.top
+                };
+            }
+
+            function startDrawing(e) {
+                e.preventDefault();
+                isDrawing = true;
+                const { x, y } = getEventPosition(e);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                currentPath.push({ x, y, t: Date.now() });
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const { x, y } = getEventPosition(e);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                currentPath.push({ x, y, t: Date.now() });
+            }
+
+            function stopDrawing() {
+                isDrawing = false;
+            }
+
+            function clearCanvas() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                currentPath = [];
+                verificationResults.innerHTML = '';
+                showStatus('הלוח נוקה. ניתן לחתום שוב.', 'info');
+            }
+
+            // --- Core Biometric Logic ---
+            function extractFeatures(path) {
+                if (path.length < 10) return null; // חתימה קצרה מדי
+
+                // 1. זמן כולל
+                const totalTime = path[path.length - 1].t - path[0].t;
+
+                // 2. אורך כולל של הקו
+                let totalLength = 0;
+                for (let i = 1; i < path.length; i++) {
+                    const dx = path[i].x - path[i-1].x;
+                    const dy = path[i].y - path[i-1].y;
+                    totalLength += Math.sqrt(dx*dx + dy*dy);
+                }
+
+                // 3. מהירות ממוצעת
+                const avgVelocity = totalTime > 0 ? totalLength / totalTime : 0;
+
+                // 4. גבולות החתימה (Bounding Box)
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                path.forEach(p => {
+                    if (p.x < minX) minX = p.x;
+                    if (p.y < minY) minY = p.y;
+                    if (p.x > maxX) maxX = p.x;
+                    if (p.y > maxY) maxY = p.y;
+                });
+                const width = maxX - minX;
+                const height = maxY - minY;
+                
+                // 5. יחס רוחב-גובה
+                const aspectRatio = width > 0 ? height / width : 0;
+                
+                // 6. נקודת התחלה וסיום (יחסית לגבולות)
+                const startX_norm = width > 0 ? (path[0].x - minX) / width : 0;
+                const startY_norm = height > 0 ? (path[0].y - minY) / height : 0;
+                const endX_norm = width > 0 ? (path[path.length-1].x - minX) / width : 0;
+                const endY_norm = height > 0 ? (path[path.length-1].y - minY) / height : 0;
+
+                return [
+                    totalTime, totalLength, avgVelocity, aspectRatio,
+                    startX_norm, startY_norm, endX_norm, endY_norm
+                ];
+            }
+            
+            function euclideanDistanceSquared(vecA, vecB) {
+                if (!vecA || !vecB || vecA.length !== vecB.length) return Infinity;
+                let sum = 0;
+                // הוספת משקולות כדי לתת חשיבות שונה לכל מאפיין
+                const weights = [0.0001, 0.01, 1, 1000, 500, 500, 500, 500];
+                for (let i = 0; i < vecA.length; i++) {
+                    const diff = vecA[i] - vecB[i];
+                    sum += (diff * diff) * (weights[i] || 1);
+                }
+                return sum;
+            }
+
+            function handleAddSignature() {
+                const name = personNameInput.value.trim();
+                if (!name) {
+                    showStatus('אנא הזן שם.', 'error');
+                    return;
+                }
+                if (currentPath.length < 10) {
+                    showStatus('יש לחתום לפני ההוספה.', 'error');
+                    return;
+                }
+                 if (signaturesDB.find(entry => entry.name === name)) {
+                     showStatus(`השם '${name}' כבר קיים במאגר.`, 'error'); return;
+                }
+
+                const features = extractFeatures(currentPath);
+                if (features) {
+                    signaturesDB.push({ name, features });
+                    saveSignaturesToDB();
+                    showStatus(`חתימה עבור <strong>${name}</strong> נשמרה בהצלחה.`, 'success');
+                    personNameInput.value = '';
+                    clearCanvas();
+                } else {
+                    showStatus('החתימה קצרה מדי, לא ניתן לעבד.', 'error');
+                }
+            }
+
+            function handleVerifySignature() {
+                if (currentPath.length < 10) {
+                    showStatus('יש לחתום לפני ביצוע אימות.', 'error');
+                    return;
+                }
+                if (signaturesDB.length === 0) {
+                    showStatus('מאגר החתימות ריק. יש להוסיף חתימה תחילה.', 'info');
+                    return;
+                }
+
+                const newFeatures = extractFeatures(currentPath);
+                if (!newFeatures) {
+                    showStatus('החתימה קצרה מדי, לא ניתן לאמת.', 'error');
+                    return;
+                }
+                
+                let bestMatch = null;
+                let minDistance = Infinity;
+
+                for (const storedSignature of signaturesDB) {
+                    const distance = euclideanDistanceSquared(newFeatures, storedSignature.features);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestMatch = storedSignature;
+                    }
+                }
+
+                let similarityPercentage = Math.max(0, (1 - (minDistance / MAX_EXPECTED_DISTANCE)) * 100);
+
+                if (bestMatch && minDistance < SIMILARITY_THRESHOLD) {
+                    verificationResults.innerHTML = `זיהוי הצליח: <strong>${bestMatch.name}</strong><br>(דמיון: ${similarityPercentage.toFixed(1)}%)`;
+                    showStatus('אימות הושלם - זוהתה התאמה.', 'success');
+                } else {
+                    verificationResults.innerHTML = `לא זוהתה התאמה ודאית.<br>הכי קרוב: ${bestMatch.name} (דמיון: ${similarityPercentage.toFixed(1)}%)`;
+                    showStatus('אימות הושלם - לא נמצאה התאמה מספקת.', 'info');
+                }
+            }
+
+            function showStatus(message, type = 'info') {
+                statusMessage.innerHTML = message;
+                statusMessage.className = `status-display status-${type}`;
+            }
+
+            // --- Local Storage ---
+            function saveSignaturesToDB() {
+                try {
+                    localStorage.setItem('signatureRecognitionDB_v1', JSON.stringify(signaturesDB));
+                } catch (e) {
+                    console.error("Error saving to DB:", e);
+                    showStatus("שגיאה בשמירת המאגר.", "error");
+                }
+            }
+
+            function loadSignaturesFromDB() {
+                const data = localStorage.getItem('signatureRecognitionDB_v1');
+                if (data) {
+                    try {
+                        const parsedData = JSON.parse(data);
+                        if (Array.isArray(parsedData)) {
+                            signaturesDB = parsedData;
+                        }
+                    } catch (e) {
+                        console.error("Error parsing DB:", e);
+                        signaturesDB = [];
+                    }
+                }
+            }
+            
+            // --- Start the App ---
+            initializeApp();
+        });
+    </script>
+</body>
+</html>

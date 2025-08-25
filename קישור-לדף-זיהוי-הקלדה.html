@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>זיהוי סגנון הקלדה - מערכת זיהוי ביומטרי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D0F10; 
+            --card-bg: #1A1C1E; 
+            --input-bg: #2a2d30; /* רקע לשדות טקסט */
+            --text-to-type-bg: #101214; /* רקע לאזור הטקסט להקלדה */
+            --accent-color: #03dac6; 
+            --accent-color-hover: #7fffd4; 
+            --border-color-base: #282a2c; 
+            --text-color-primary: #e8eaed; 
+            --text-color-secondary: #9aa0a6; 
+            --text-correct: var(--success-color);
+            --text-incorrect: var(--error-color);
+            --caret-color: var(--accent-color);
+            --button-text-color: #0a0a0a;
+            --success-color: #38A169; 
+            --error-color: #E53E3E;   
+            --info-color: #00aeff; 
+            --card-radius: 10px;
+            --spacing-unit: 16px; 
+            --shadow-base: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-primary); background-color: var(--bg-color); color: var(--text-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            padding: var(--spacing-unit); 
+        }
+
+        .app-container {
+            width: 100%; max-width: 800px; 
+            background-color: var(--card-bg);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-base);
+            border: 1px solid var(--border-color-base);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - (var(--spacing-unit) * 2)); 
+            position: relative;
+        }
+
+        header { text-align: center; margin-bottom: var(--spacing-unit); flex-shrink: 0; }
+        header h1 { font-size: 1.8em; font-weight: 600; margin: 0; }
+        .back-link {
+            position: absolute; top: calc(var(--spacing-unit)*1.2); right: calc(var(--spacing-unit)*1.2);
+            font-size: 0.8em; color: var(--accent-color); text-decoration: none;
+            font-weight: 500; transition: color 0.2s ease; display: flex; align-items: center;
+        }
+        .back-link:hover { color: var(--accent-color-hover); }
+        .back-link svg { width: 14px; height: 14px; margin-left: calc(var(--spacing-unit) * 0.4); fill: currentColor;}
+
+        .main-content {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.5); gap: var(--spacing-unit);
+        }
+        .main-content::-webkit-scrollbar { width: 5px; }
+        .main-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 3px;}
+        .main-content::-webkit-scrollbar-thumb { background: var(--border-color-base); border-radius: 3px;}
+        .main-content::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+
+        .typing-module-section {
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 1); width: 100%; max-width: 600px; 
+        }
+        
+        #textToTypeContainer {
+            background-color: var(--text-to-type-bg);
+            padding: var(--spacing-unit);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color-base);
+            font-size: 1.1em;
+            line-height: 1.6;
+            color: var(--text-color-secondary);
+            width: 100%;
+            text-align: right; /* For Hebrew text */
+            margin-bottom: calc(var(--spacing-unit) * 0.5);
+            user-select: none; /* Prevent text selection */
+        }
+        #textToTypeContainer span.typed-correct { color: var(--text-correct); }
+        #textToTypeContainer span.typed-incorrect { 
+            color: var(--text-incorrect); 
+            text-decoration: underline;
+            text-decoration-color: var(--text-incorrect);
+        }
+        #textToTypeContainer span.caret {
+            border-right: 2px solid var(--caret-color);
+            margin-right: -2px; /* Adjust for border */
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            50% { border-right-color: transparent; }
+        }
+
+
+        #typingInput {
+            width: 100%;
+            background-color: var(--input-bg);
+            color: var(--text-color-primary);
+            border: 1px solid var(--border-color-base);
+            border-radius: var(--card-radius);
+            padding: calc(var(--spacing-unit) * 0.8);
+            font-size: 1.1em; /* Match textToType */
+            font-family: var(--font-primary); /* Ensure same font */
+            text-align: right; /* For Hebrew text */
+            outline: none;
+        }
+        #typingInput:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 20%, transparent);
+        }
+        
+        #statusMessage {
+            width: 100%; text-align: center; padding: calc(var(--spacing-unit) * 0.6);
+            border-radius: var(--card-radius); font-weight: 500; font-size: 0.85em;
+            min-height: calc(var(--spacing-unit) * 1.2 + 16px); background-color: rgba(0,0,0,0.2);
+            color: var(--text-color-secondary); border: 1px solid transparent;
+            transition: background-color 0.25s ease-out, color 0.25s ease-out, border-color 0.25s ease-out;
+        }
+        .status-success { background-color: rgba(56, 161, 105, 0.1); color: var(--success-color); border-color: var(--success-color); }
+        .status-error   { background-color: rgba(229, 62, 62, 0.1); color: var(--error-color); border-color: var(--error-color); }
+        .status-info    { background-color: rgba(0, 174, 255, 0.1); color: var(--info-color); border-color: var(--info-color); }
+
+        .actions-area {
+            display: grid; grid-template-columns: 1fr; 
+            gap: var(--spacing-unit); width: 100%; max-width: 700px; 
+            margin-top: var(--spacing-unit);
+        }
+        @media (min-width: 600px) { .actions-area { grid-template-columns: 1fr 1fr; } }
+
+        .action-group {
+            background-color: rgba(255,255,255,0.03); 
+            padding: calc(var(--spacing-unit) * 1.5); border-radius: var(--card-radius);
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); border: 1px solid var(--border-color-base);
+            min-height: 150px; /* Reduced height as no complex interaction area */
+            justify-content: center; 
+        }
+        .action-group h2 { font-size: 1.2em; font-weight: 600; margin: 0 0 var(--spacing-unit) 0; color: var(--text-color-primary); }
+        
+        input[type="text"].name-input { /* Specific for the name input */
+            background-color: var(--input-bg); border: 1px solid var(--border-color-base);
+            color: var(--text-color-primary); border-radius: var(--card-radius);
+            padding: calc(var(--spacing-unit) * 0.7); width: 100%; max-width: 220px;
+            text-align: center; font-size: 0.9em; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input[type="text"].name-input:focus { 
+            outline: none; border-color: var(--accent-color); 
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 20%, transparent);
+        }
+
+        .btn {
+            background-color: var(--accent-color); color: var(--button-text-color); border: none;
+            padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 1.8);
+            font-size: 0.9em; font-family: var(--font-primary); font-weight: 700;
+            border-radius: var(--card-radius); cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            display: inline-flex; align-items: center; justify-content:center; gap: calc(var(--spacing-unit) * 0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            min-width: 180px;
+        }
+        .btn:hover:not(:disabled) { background-color: var(--accent-color-hover); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:disabled { background-color: var(--border-color-base); color: var(--text-color-secondary); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        
+        .results-output { font-size: 0.9em; color: var(--text-color-primary); text-align: center; min-height: calc(var(--spacing-unit) * 1.5); margin-top:var(--spacing-unit); }
+        .results-output strong { color: var(--accent-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <a href="mainPage.html" class="back-link">
+             חזרה <svg viewBox="0 0 20 20"><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+        </a>
+        <header><h1>זיהוי סגנון הקלדה</h1></header>
+        
+        <div class="main-content" id="mainContentWrapper">
+            <div class="typing-module-section">
+                <p>הקלד את הטקסט הבא בדיוק כפי שהוא מופיע:</p>
+                <div id="textToTypeContainer">
+                    <!-- Text to type will be injected here by JS -->
+                </div>
+                <input type="text" id="typingInput" dir="rtl" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="התחל להקליד כאן..." disabled>
+                <div id="statusMessage" class="status-display">לחץ "התחל רישום" או "התחל אימות" כדי להתחיל.</div>
+            </div>
+            <div class="actions-area">
+                <div class="action-group">
+                    <h2>הוספה למאגר</h2>
+                    <input type="text" id="personName" class="name-input" placeholder="שם מלא">
+                    <button id="startRegistrationButton" class="btn">התחל רישום</button>
+                </div>
+                <div class="action-group">
+                    <h2>אימות הקלדה</h2>
+                    <button id="startVerificationButton" class="btn">התחל אימות</button>
+                    <div class="results-output" id="verificationResults"></div>
+                </div>
+            </div>
+        </div> 
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const personNameInput = document.getElementById('personName');
+            const startRegistrationButton = document.getElementById('startRegistrationButton');
+            const startVerificationButton = document.getElementById('startVerificationButton');
+            const statusMessage = document.getElementById('statusMessage');
+            const verificationResults = document.getElementById('verificationResults');
+            
+            const textToTypeContainer = document.getElementById('textToTypeContainer');
+            const typingInput = document.getElementById('typingInput');
+
+            // Sample texts - choose one or rotate them. Using a consistent one is better for comparison.
+            const SAMPLE_TEXT_HE = "השועל החום המהיר קופץ מעל הכלב העצלן."; 
+            // const SAMPLE_TEXT_EN = "The quick brown fox jumps over the lazy dog.";
+            let textToType = SAMPLE_TEXT_HE;
+
+            let keyPressData = []; // Stores {key, pressTime, releaseTime, prevReleaseTime}
+            let currentTypedString = "";
+            let isTypingActive = false;
+            let sessionType = null; // 'registration' or 'verification'
+            let lastReleaseTime = 0;
+            let keyPressTimestamps = {}; // To store press time for each key: {keyCode: timestamp}
+
+            let recordedSignatures = []; // { name: string, features: number[] }
+            
+            // Thresholds for feature comparison (needs extensive tuning)
+            const SIMILARITY_THRESHOLD = 0.75; // Cosine similarity, higher is better
+            const MAX_TIME_DIFF = 2000; // Max plausible time for a dwell or flight (ms) - for outlier capping
+
+
+            function initializeApp() {
+                renderTextToType();
+                showStatus('לחץ "התחל רישום" או "התחל אימות" כדי להתחיל.', 'info');
+                loadSignaturesFromDB();
+                updateUIState();
+                typingInput.addEventListener('keydown', handleKeyDown);
+                typingInput.addEventListener('keyup', handleKeyUp);
+                typingInput.addEventListener('input', handleInput); // For visual feedback
+            }
+
+            function renderTextToType(typedLength = 0, errors = []) {
+                let html = "";
+                for (let i = 0; i < textToType.length; i++) {
+                    let charClass = "";
+                    if (i < typedLength) {
+                        charClass = errors[i] ? "typed-incorrect" : "typed-correct";
+                    }
+                    if (i === typedLength) {
+                        html += `<span class="caret"></span>`; // Add caret before the next char to type
+                    }
+                    html += `<span class="${charClass}">${textToType[i]}</span>`;
+                }
+                if (typedLength === textToType.length) { // Caret at the end if all typed
+                     html += `<span class="caret"></span>`;
+                }
+                textToTypeContainer.innerHTML = html;
+            }
+            
+            function startTypingSession(type) {
+                if (isTypingActive) return;
+
+                sessionType = type;
+                isTypingActive = true;
+                keyPressData = [];
+                currentTypedString = "";
+                lastReleaseTime = 0;
+                keyPressTimestamps = {};
+                
+                typingInput.value = "";
+                typingInput.disabled = false;
+                typingInput.focus();
+                renderTextToType();
+                verificationResults.innerHTML = '';
+                showStatus(`הקלד את הטקסט המוצג.`, 'info');
+                updateUIState();
+            }
+
+            function handleKeyDown(event) {
+                if (!isTypingActive) return;
+
+                // Prevent capturing if meta keys (Cmd, Ctrl, Alt) are pressed, unless it's Shift for capitalization
+                if (!event.shiftKey && (event.metaKey || event.ctrlKey || event.altKey)) {
+                    return;
+                }
+                // Ignore keys like Tab, Enter (unless specific text requires them), CapsLock, etc.
+                const ignoredKeys = ['Tab', 'Enter', 'CapsLock', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Control', 'Alt', 'Meta', 'Shift', 'ContextMenu'];
+                if (ignoredKeys.includes(event.key) && event.key.length > 1) { // Check length to allow single char shift keys if needed
+                    // If it's just Shift, we let it pass to allow capital letters.
+                    // Other control keys are generally ignored for simple text typing.
+                    if (event.key !== 'Shift') return; 
+                }
+
+
+                const pressTime = Date.now();
+                // Store press time only if not already pressed (to handle key repeats correctly)
+                if (!keyPressTimestamps[event.key]) { 
+                    keyPressTimestamps[event.key] = pressTime;
+                }
+                // For actual data logging, we'll use keyup to get dwell time
+            }
+
+            function handleKeyUp(event) {
+                if (!isTypingActive || !keyPressTimestamps[event.key]) return;
+
+                const releaseTime = Date.now();
+                const pressTime = keyPressTimestamps[event.key];
+                delete keyPressTimestamps[event.key]; // Clear timestamp for this key
+
+                const dwellTime = releaseTime - pressTime;
+                const flightTime = lastReleaseTime > 0 ? pressTime - lastReleaseTime : 0; // Time from prev key release to this key press
+
+                // Filter out unrealistically long dwell/flight times (e.g., user paused)
+                // or very short ones (potential noise)
+                if (dwellTime > 0 && dwellTime < MAX_TIME_DIFF && flightTime >= 0 && flightTime < MAX_TIME_DIFF) {
+                     // Only log for printable characters or backspace
+                    if (event.key.length === 1 || event.key === 'Backspace') {
+                        keyPressData.push({
+                            key: event.key, // Could use event.code for physical key if preferred
+                            dwell: dwellTime,
+                            flight: keyPressData.length === 0 ? 0 : flightTime, // First key has 0 flight time to previous
+                        });
+                    }
+                }
+                lastReleaseTime = releaseTime;
+            }
+
+            function handleInput() { // Primarily for visual feedback and checking completion
+                if (!isTypingActive) return;
+                
+                currentTypedString = typingInput.value;
+                const errors = [];
+                for(let i=0; i < currentTypedString.length; i++) {
+                    errors[i] = currentTypedString[i] !== textToType[i];
+                }
+                renderTextToType(currentTypedString.length, errors);
+
+                if (currentTypedString.length >= textToType.length) {
+                    finishTypingSession();
+                }
+            }
+
+            function finishTypingSession() {
+                isTypingActive = false;
+                typingInput.disabled = true;
+                updateUIState();
+
+                // Simple check: did user type the exact string?
+                if (currentTypedString !== textToType) {
+                    showStatus(`הטקסט שהוקלד אינו תואם. נסה שוב.`, 'error');
+                    return;
+                }
+                if (keyPressData.length < textToType.length * 0.8) { // Arbitrary: need data for at least 80% of chars
+                    showStatus(`לא נאספו מספיק נתוני הקלדה (${keyPressData.length} אירועים). נסה שוב והקלד באופן רציף.`, 'error');
+                    return;
+                }
+
+                showStatus('מעבד נתוני הקלדה...', 'info');
+                setTimeout(() => {
+                    const features = extractFeaturesFromKeystrokes(keyPressData);
+                    if (!features || features.length === 0) {
+                         showStatus('שגיאה בעיבוד נתוני ההקלדה. נסה שוב.', 'error'); return;
+                    }
+
+                    if (sessionType === 'registration') {
+                        const name = personNameInput.value.trim();
+                        recordedSignatures.push({ name, features });
+                        saveSignaturesToDB();
+                        showStatus(`חתימת הקלדה עבור <strong>${name}</strong> נשמרה בהצלחה!`, 'success');
+                        personNameInput.value = '';
+                    } else if (sessionType === 'verification') {
+                        verifySignature(features);
+                    }
+                }, 50);
+            }
+            
+            // Extracts a feature vector from keystroke data
+            function extractFeaturesFromKeystrokes(data) {
+                if (!data || data.length === 0) return [];
+
+                const features = [];
+                // Example features: average dwell time, average flight time,
+                // specific digram/trigram timings.
+                // For simplicity, we'll use average dwell and flight times for now.
+                // We should extract timings for each character pair (digraphs).
+                // The vector should be fixed length.
+
+                // Create a feature vector of fixed length based on character pairs in the sample text
+                // For each character in `textToType` (excluding the last for flight times):
+                // - Dwell time of char i
+                // - Flight time from char i to char i+1
+
+                // This needs `textToType` to be consistent for feature vector length
+                const featureVector = [];
+                let dataIndex = 0;
+
+                for (let i = 0; i < textToType.length && dataIndex < data.length; i++) {
+                    // Find the corresponding key event in data
+                    // This is simplified; assumes data events roughly match textToType sequence
+                    // A more robust method would align based on event.key if it matches textToType[i]
+                    
+                    let currentEvent = null;
+                    // Find the next event in keyPressData that matches the expected character
+                    // This simple loop might not be robust enough if there are many typos/corrections
+                    // that were not filtered out or if user types something totally different.
+                    while(dataIndex < data.length) {
+                        if(data[dataIndex].key === textToType[i] || (textToType[i] === ' ' && data[dataIndex].key === 'Spacebar')) { // 'Spacebar' for event.key
+                           currentEvent = data[dataIndex];
+                           dataIndex++;
+                           break;
+                        }
+                        // If it's a backspace, it means a correction, which complicates alignment
+                        // For now, we'll be optimistic and assume relatively clean typing matching the text.
+                        if (data[dataIndex].key === 'Backspace') {
+                           //This makes fixed-length feature extraction harder.
+                           //Potentially skip backspace and the character it corrected.
+                        }
+                        dataIndex++; // Skip non-matching events for now
+                    }
+
+
+                    if (currentEvent) {
+                        featureVector.push(currentEvent.dwell);
+                        if (i < textToType.length - 1) { // Flight time to next char
+                            // The 'flight' in currentEvent is flight *to* currentEvent.
+                            // We need flight *from* currentEvent to *next* expected char.
+                            // This is tricky with current data structure.
+                            // Let's use currentEvent.flight which is from PREVIOUS char to THIS char.
+                            // So, featureVector will be: D1, F1->2, D2, F2->3, D3 ...
+                            // Flight time for first char to second.
+                            featureVector.push(currentEvent.flight);
+                        }
+                    } else {
+                        // Missing data for this character in textToType. Pad with a default/average.
+                        // Or, this indicates a serious mismatch. For now, pad with 0.
+                        featureVector.push(0); // Placeholder for dwell
+                        if (i < textToType.length - 1) {
+                            featureVector.push(0); // Placeholder for flight
+                        }
+                    }
+                }
+                
+                // Ensure fixed length if data was shorter (e.g. user didn't type full text but it was accepted)
+                // Expected length: (textToType.length * 2) - 1 (dwell for each, flight for each pair)
+                const expectedLength = (textToType.length * 2) -1; 
+                while(featureVector.length < expectedLength) {
+                    featureVector.push(0); // Pad with 0s
+                }
+                // Truncate if too long (shouldn't happen with current logic but good for safety)
+                return featureVector.slice(0, expectedLength);
+            }
+
+
+            function verifySignature(newFeatures) {
+                if (recordedSignatures.length === 0) {
+                    verificationResults.innerHTML = 'המאגר ריק. יש להוסיף חתימות הקלדה תחילה.';
+                    showStatus('לא ניתן לאמת - מאגר החתימות ריק.', 'info'); return;
+                }
+                let bestMatch = null;
+                let maxSimilarity = -1; // Using cosine similarity
+
+                for (const entry of recordedSignatures) {
+                    if (entry.features.length !== newFeatures.length) {
+                        console.warn("Feature vector length mismatch. Skipping comparison for entry:", entry.name);
+                        continue; // Cannot compare if lengths differ
+                    }
+                    const similarity = cosineSimilarity(newFeatures, entry.features);
+                    if (similarity > maxSimilarity) {
+                        maxSimilarity = similarity;
+                        bestMatch = entry;
+                    }
+                }
+                
+                if (bestMatch && maxSimilarity >= SIMILARITY_THRESHOLD) {
+                    verificationResults.innerHTML = `זיהוי הצליח: <strong>${bestMatch.name}</strong> (דמיון: ${(maxSimilarity * 100).toFixed(1)}%)`;
+                    showStatus('אימות הושלם - זוהתה התאמה.', 'success');
+                } else if (bestMatch) {
+                     verificationResults.innerHTML = `לא זוהתה התאמה ודאית. הקרוב ביותר: ${bestMatch.name} (דמיון: ${(maxSimilarity * 100).toFixed(1)}%)`;
+                     showStatus('אימות הושלם - לא נמצאה התאמה מספקת.', 'info');
+                } else { 
+                    verificationResults.innerHTML = 'לא נמצאה התאמה במאגר (או שגיאה בוקטורים).';
+                    showStatus('אימות הושלם - לא נמצאה התאמה.', 'info');
+                }
+            }
+
+            function cosineSimilarity(vecA, vecB) {
+                if (!vecA || !vecB || vecA.length !== vecB.length || vecA.length === 0) return 0;
+                let dotProduct = 0; let normA = 0; let normB = 0;
+                for (let i = 0; i < vecA.length; i++) {
+                    dotProduct += vecA[i] * vecB[i];
+                    normA += vecA[i] * vecA[i];
+                    normB += vecB[i] * vecB[i];
+                }
+                if (normA === 0 || normB === 0) return 0;
+                return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+            }
+            
+
+            function showStatus(message, type = 'info') {
+                statusMessage.innerHTML = message;
+                statusMessage.className = `status-display status-${type}`;
+            }
+            
+            function updateUIState() {
+                const disableButtons = isTypingActive;
+                startRegistrationButton.disabled = disableButtons;
+                startVerificationButton.disabled = disableButtons;
+                personNameInput.disabled = disableButtons; // Disable name input during typing
+            }
+
+            function saveSignaturesToDB() {
+                try { localStorage.setItem('keystrokeSignaturesDB', JSON.stringify(recordedSignatures)); }
+                catch (e) { console.error("Error saving to DB:", e); showStatus("שגיאה בשמירה.", "error");}
+            }
+
+            function loadSignaturesFromDB() {
+                const data = localStorage.getItem('keystrokeSignaturesDB');
+                if (data) {
+                    try {
+                        const parsedData = JSON.parse(data);
+                         if (Array.isArray(parsedData)) {
+                           recordedSignatures = parsedData.filter(entry => entry.features && Array.isArray(entry.features));
+                        } else { recordedSignatures = []; }
+                    } catch (e) {
+                        console.error("Error parsing data from DB", e);
+                        localStorage.removeItem('keystrokeSignaturesDB'); recordedSignatures = [];
+                    }
+                }
+            }
+            
+            startRegistrationButton.addEventListener('click', () => {
+                if (isTypingActive) return;
+                const name = personNameInput.value.trim();
+                if (!name) { showStatus('אנא הזן שם.', 'error'); personNameInput.focus(); return; }
+                if (recordedSignatures.find(entry => entry.name === name)) {
+                     showStatus(`שם '${name}' כבר קיים.`, 'error'); personNameInput.focus(); return;
+                }
+                startTypingSession('registration');
+            });
+            startVerificationButton.addEventListener('click', () => {
+                if (isTypingActive) return;
+                startTypingSession('verification');
+            });
+
+            initializeApp();
+        });
+    </script>
+</body>
+</html>

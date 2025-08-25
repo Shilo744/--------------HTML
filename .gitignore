@@ -1,0 +1,26 @@
+# Node.js dependencies
+node_modules/
+
+# Model weights and other large binaries
+weights/
+
+# VS Code settings
+.vscode/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build / output
+/dist/
+/build/
+
+# Environment files
+.env
+
+# Package manager locks (optional)
+package-lock.json
+yarn.lock

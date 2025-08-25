@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>זיהוי גאומטריית כף יד - מערכת זיהוי ביומטרי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D0F10; 
+            --card-bg: #1A1C1E; 
+            --input-bg: #2a2d30;
+            --accent-color: #03dac6; 
+            --accent-color-hover: #7fffd4; 
+            --border-color-base: #282a2c; 
+            --text-color-primary: #e8eaed; 
+            --text-color-secondary: #9aa0a6; 
+            --button-text-color: #0a0a0a;
+            --success-color: #38A169; 
+            --error-color: #E53E3E;   
+            --info-color: #00aeff; 
+            --loader-color: var(--accent-color);
+            --card-radius: 10px;
+            --spacing-unit: 16px; 
+            --shadow-base: 0 4px 10px rgba(0, 0, 0, 0.3);
+            --stencil-color-default: rgba(255, 255, 255, 0.25);
+            --stencil-color-success: rgba(3, 218, 198, 0.7);
+        }
+
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-primary); background-color: var(--bg-color); color: var(--text-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            padding: var(--spacing-unit); 
+        }
+
+        .app-container {
+            width: 100%; max-width: 800px; 
+            background-color: var(--card-bg);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-base);
+            border: 1px solid var(--border-color-base);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - (var(--spacing-unit) * 2)); 
+            position: relative;
+        }
+
+        header { text-align: center; margin-bottom: var(--spacing-unit); flex-shrink: 0; }
+        header h1 { font-size: 1.8em; font-weight: 600; margin: 0; }
+        .back-link {
+            position: absolute; top: calc(var(--spacing-unit)*1.2); right: calc(var(--spacing-unit)*1.2);
+            font-size: 0.8em; color: var(--accent-color); text-decoration: none;
+            font-weight: 500; transition: color 0.2s ease; display: flex; align-items: center;
+        }
+        .back-link:hover { color: var(--accent-color-hover); }
+        .back-link svg { width: 14px; height: 14px; margin-left: calc(var(--spacing-unit) * 0.4); fill: currentColor;}
+
+        .main-content {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.5); gap: var(--spacing-unit);
+        }
+
+        .video-section {
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); width: 100%; max-width: 420px; 
+        }
+        .video-container {
+            position: relative; width: 100%; aspect-ratio: 4 / 3;
+            background-color: #000; border-radius: var(--card-radius); overflow: hidden;
+            border: 1px solid var(--border-color-base); box-shadow: var(--shadow-base);
+        }
+        #videoFeed, #overlayCanvas { display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        #overlayCanvas { position: absolute; top: 0; left: 0; z-index: 5;}
+        
+        #stencilContainer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #stencilBox {
+            width: 60%;
+            height: 80%;
+            border: 3px dashed var(--stencil-color-default);
+            border-radius: var(--card-radius);
+            transition: all 0.3s ease-out;
+        }
+        #stencilContainer.success #stencilBox {
+            border-color: var(--stencil-color-success);
+            box-shadow: 0 0 15px var(--stencil-color-success);
+        }
+
+        #statusMessage {
+            width: 100%; text-align: center; padding: calc(var(--spacing-unit) * 0.6);
+            border-radius: var(--card-radius); font-weight: 500; font-size: 0.85em;
+            min-height: calc(var(--spacing-unit) * 1.2 + 16px); background-color: rgba(0,0,0,0.2);
+            color: var(--text-color-secondary); border: 1px solid transparent;
+            transition: all 0.2s ease-out;
+        }
+        .status-success { background-color: rgba(56, 161, 105, 0.1); color: var(--success-color); border-color: var(--success-color); }
+        .status-error   { background-color: rgba(229, 62, 62, 0.1); color: var(--error-color); border-color: var(--error-color); }
+        .status-info    { background-color: rgba(0, 174, 255, 0.1); color: var(--info-color); border-color: var(--info-color); }
+
+        .loader-container { display: flex; text-align: center; padding: var(--spacing-unit); position: absolute; top:50%; left:50%; transform: translate(-50%,-50%); z-index: 20; flex-direction:column; align-items:center; }
+        .loader { border: 4px solid rgba(220, 220, 220, 0.15); border-left-color: var(--loader-color); border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto var(--spacing-unit) auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .actions-area { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-unit); width: 100%; max-width: 700px; margin-top: var(--spacing-unit); }
+        .action-group { background-color: rgba(255,255,255,0.03); padding: calc(var(--spacing-unit) * 1.5); border-radius: var(--card-radius); display: flex; flex-direction: column; align-items: center; gap: calc(var(--spacing-unit) * 0.8); border: 1px solid var(--border-color-base); min-height: 180px; justify-content: center; }
+        .action-group h2 { font-size: 1.2em; font-weight: 600; margin: 0 0 var(--spacing-unit) 0; color: var(--text-color-primary); }
+        input[type="text"] { background-color: var(--input-bg); border: 1px solid var(--border-color-base); color: var(--text-color-primary); border-radius: var(--card-radius); padding: calc(var(--spacing-unit) * 0.7); width: 100%; max-width: 220px; text-align: center; font-size: 0.9em; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        input[type="text"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(3, 218, 198, 0.2); }
+        .btn { background-color: var(--accent-color); color: var(--button-text-color); border: none; padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 1.8); font-size: 0.9em; font-family: var(--font-primary); font-weight: 700; border-radius: var(--card-radius); cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--spacing-unit) * 0.5); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:hover:not(:disabled) { background-color: var(--accent-color-hover); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:disabled { background-color: var(--border-color-base); color: var(--text-color-secondary); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        .results-output { font-size: 0.9em; color: var(--text-color-primary); text-align: center; min-height: calc(var(--spacing-unit) * 2.5); margin-top:var(--spacing-unit); }
+        .results-output strong { color: var(--accent-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <a href="mainPage.html" class="back-link">
+             חזרה <svg viewBox="0 0 20 20"><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+        </a>
+        <header><h1>זיהוי גאומטריית כף יד</h1></header>
+
+        <div class="loader-container" id="loaderContainer"><div class="loader"></div><p>טוען מודלים...</p></div>
+        
+        <div class="main-content" id="mainContentWrapper" style="display:none;">
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="videoFeed" style="display: none;"></video>
+                    <canvas id="overlayCanvas"></canvas>
+                    <div id="stencilContainer"><div id="stencilBox"></div></div>
+                </div>
+                <div id="statusMessage"></div>
+            </div>
+            <div class="actions-area">
+                <div class="action-group">
+                    <h2>הוספה למאגר</h2>
+                    <input type="text" id="personName" placeholder="שם מלא">
+                    <button id="addHandButton" class="btn" disabled>הוסף למאגר</button>
+                </div>
+                <div class="action-group">
+                    <h2>אימות</h2>
+                    <button id="verifyHandButton" class="btn" disabled>בצע אימות</button>
+                    <div class="results-output" id="verificationResults"></div>
+                </div>
+            </div>
+        </div> 
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const videoElement = document.getElementById('videoFeed');
+        const canvasElement = document.getElementById('overlayCanvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const loaderContainer = document.getElementById('loaderContainer');
+        const mainContentWrapper = document.getElementById('mainContentWrapper');
+        const statusMessage = document.getElementById('statusMessage');
+        const personNameInput = document.getElementById('personName');
+        const addHandButton = document.getElementById('addHandButton');
+        const verifyHandButton = document.getElementById('verifyHandButton');
+        const verificationResults = document.getElementById('verificationResults');
+        const stencilContainer = document.getElementById('stencilContainer');
+        
+        let latestLandmarks = null;
+        let signaturesDB = [];
+        // --- NEW THRESHOLDS for the new feature vector ---
+        const SIMILARITY_THRESHOLD = 0.08; // Needs calibration
+        const MAX_EXPECTED_DISTANCE = 0.2; // Needs calibration
+
+        const STENCIL_BOUNDS = { x_min: 0.20, x_max: 0.80, y_min: 0.10, y_max: 0.90 };
+
+        // --- NEW: Vector math helper functions ---
+        const vec = {
+            subtract: (v1, v2) => ({ x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z }),
+            magnitude: (v) => Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z),
+            normalize: (v) => {
+                const mag = vec.magnitude(v);
+                if (mag === 0) return { x: 0, y: 0, z: 0 };
+                return { x: v.x / mag, y: v.y / mag, z: v.z / mag };
+            },
+            dot: (v1, v2) => v1.x * v2.x + v1.y * v2.y + v1.z * v2.z,
+            cross: (v1, v2) => ({
+                x: v1.y * v2.z - v1.z * v2.y,
+                y: v1.z * v2.x - v1.x * v2.z,
+                z: v1.x * v2.y - v1.y * v2.x
+            })
+        };
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const handLandmarks = results.multiHandLandmarks[0];
+                latestLandmarks = handLandmarks;
+                
+                drawConnectors(canvasCtx, handLandmarks, HAND_CONNECTIONS, { color: '#FFFFFF', lineWidth: 2 });
+                drawLandmarks(canvasCtx, handLandmarks, { color: '#03dac6', lineWidth: 1, radius: 4 });
+                
+                checkHandPosition(handLandmarks);
+            } else {
+                latestLandmarks = null;
+                stencilContainer.classList.remove('success');
+                showStatus('מקם את כף היד שלך בתוך המתאר.', 'info');
+                enableActionButtons(false);
+            }
+            canvasCtx.restore();
+        }
+        
+        // --- NEW: Normalizes hand landmarks to be rotation-invariant ---
+        function normalizeHandCoordinates(landmarks) {
+            if (!landmarks || landmarks.length !== 21) return null;
+
+            const origin = landmarks[0]; // Wrist as origin
+            
+            // Y-axis: From wrist to middle finger MCP
+            const y_axis_raw = vec.subtract(landmarks[9], origin);
+            const y_axis = vec.normalize(y_axis_raw);
+
+            // Z-axis: Perpendicular to the palm, using cross product
+            const temp_vec = vec.subtract(landmarks[5], origin);
+            const z_axis_raw = vec.cross(y_axis, temp_vec);
+            const z_axis = vec.normalize(z_axis_raw);
+
+            // X-axis: Perpendicular to Y and Z axes
+            const x_axis = vec.cross(y_axis, z_axis);
+
+            const normalizedLandmarks = [];
+            for (const landmark of landmarks) {
+                const p = vec.subtract(landmark, origin);
+                normalizedLandmarks.push({
+                    x: vec.dot(p, x_axis),
+                    y: vec.dot(p, y_axis),
+                    z: vec.dot(p, z_axis)
+                });
+            }
+            return normalizedLandmarks;
+        }
+
+        // --- UPDATED: Feature extraction now uses the normalized coordinates ---
+        function extractFeatures(landmarks) {
+            const normalizedLandmarks = normalizeHandCoordinates(landmarks);
+            if (!normalizedLandmarks) return null;
+
+            // The feature vector is now the flattened list of all normalized 3D coordinates.
+            // This captures the intrinsic 3D shape of the hand, invariant to rotation.
+            const features = [];
+            for (const p of normalizedLandmarks) {
+                features.push(p.x, p.y, p.z);
+            }
+            return features; // A vector of 63 values (21 points * 3 coords)
+        }
+
+        // --- The rest of the logic remains largely the same ---
+        
+        function checkHandPosition(landmarks) {
+            const wrist = landmarks[0];
+            const middleFingerTip = landmarks[12];
+            const isWristInBounds = (wrist.x > STENCIL_BOUNDS.x_min && wrist.x < STENCIL_BOUNDS.x_max && wrist.y > STENCIL_BOUNDS.y_min && wrist.y < STENCIL_BOUNDS.y_max);
+            const isTipInBounds = (middleFingerTip.x > STENCIL_BOUNDS.x_min && middleFingerTip.x < STENCIL_BOUNDS.x_max && middleFingerTip.y > STENCIL_BOUNDS.y_min && middleFingerTip.y < STENCIL_BOUNDS.y_max);
+            
+            if (isWristInBounds && isTipInBounds) {
+                stencilContainer.classList.add('success');
+                showStatus('מצוין! היד ממוקמת נכון. ניתן לבצע פעולה.', 'success');
+                enableActionButtons(true);
+            } else {
+                stencilContainer.classList.remove('success');
+                showStatus('מקם את כף היד בתוך המתאר.', 'info');
+                enableActionButtons(false);
+            }
+        }
+        
+        function euclideanDistanceSquared(vecA, vecB) {
+            if (!vecA || !vecB || vecA.length !== vecB.length) return Infinity;
+            let sum = 0;
+            for (let i = 0; i < vecA.length; i++) { sum += Math.pow(vecA[i] - vecB[i], 2); }
+            return sum;
+        }
+        
+        function handleAddHand() {
+            const name = personNameInput.value.trim();
+            if (!name) { showStatus('אנא הזן שם.', 'error'); return; }
+            if (signaturesDB.find(entry => entry.name === name)) { showStatus(`השם '${name}' כבר קיים.`, 'error'); return; }
+            if (!latestLandmarks) { showStatus('לא זוהתה יד. נסה שוב.', 'error'); return; }
+            const features = extractFeatures(latestLandmarks);
+            if (features) {
+                signaturesDB.push({ name, features });
+                saveSignaturesToDB();
+                showStatus(`חתימת יד עבור <strong>${name}</strong> נשמרה בהצלחה.`, 'success');
+                personNameInput.value = '';
+                verificationResults.innerHTML = '';
+            } else {
+                showStatus('לא ניתן היה לחלץ מאפיינים מהיד. ודא שהיא ממוקמת נכון.', 'error');
+            }
+        }
+
+        function handleVerifyHand() {
+            if (signaturesDB.length === 0) { showStatus('המאגר ריק. יש להוסיף דגימה תחילה.', 'info'); return; }
+            if (!latestLandmarks) { showStatus('לא זוהתה יד לאימות.', 'error'); return; }
+            const featuresToVerify = extractFeatures(latestLandmarks);
+            if (!featuresToVerify) { showStatus('לא ניתן היה לחלץ מאפיינים מהיד. ודא שהיא ממוקמת נכון.', 'error'); return; }
+            let bestMatch = null;
+            let minDistance = Infinity;
+            for (const entry of signaturesDB) {
+                const distance = euclideanDistanceSquared(featuresToVerify, entry.features);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    bestMatch = entry;
+                }
+            }
+            const similarityPercentage = Math.max(0, (1 - (minDistance / MAX_EXPECTED_DISTANCE)) * 100);
+            if (bestMatch && minDistance < SIMILARITY_THRESHOLD) {
+                verificationResults.innerHTML = `זיהוי הצליח: <strong>${bestMatch.name}</strong><br>(דמיון: ${similarityPercentage.toFixed(1)}%)`;
+                showStatus('אימות הושלם - זוהתה התאמה.', 'success');
+            } else {
+                verificationResults.innerHTML = `לא זוהתה התאמה ודאית.<br>הכי קרוב: ${bestMatch.name} (דמיון: ${similarityPercentage.toFixed(1)}%)`;
+                showStatus('אימות הושלם - לא נמצאה התאמה מספקת.', 'info');
+            }
+        }
+
+        function showStatus(message, type = 'info') { statusMessage.innerHTML = message; statusMessage.className = `status-display status-${type}`; }
+        function enableActionButtons(enable) {
+            addHandButton.disabled = !enable;
+            verifyHandButton.disabled = !enable;
+        }
+        function saveSignaturesToDB() { try { localStorage.setItem('handGeometryDB_v5_rotation_invariant', JSON.stringify(signaturesDB)); } catch (e) { console.error("שגיאה בשמירה ל-DB:", e); } }
+        function loadSignaturesFromDB() { const data = localStorage.getItem('handGeometryDB_v5_rotation_invariant'); if (data) { try { signaturesDB = JSON.parse(data) || []; } catch (e) { signaturesDB = []; } } }
+        
+        loadSignaturesFromDB();
+        const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+        hands.onResults(onResults);
+        const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 640, height: 480 });
+        camera.start().then(() => {
+            loaderContainer.style.display = 'none';
+            mainContentWrapper.style.display = 'flex';
+        }).catch(err => {
+            console.error("Camera start failed:", err);
+            loaderContainer.innerHTML = 'שגיאה בהפעלת המצלמה. אנא אשר גישה ורענן את הדף.';
+        });
+        addHandButton.addEventListener('click', handleAddHand);
+        verifyHandButton.addEventListener('click', handleVerifyHand);
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>זיהוי תנועות עכבר - מערכת זיהוי ביומטרי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D0F10; 
+            --card-bg: #1A1C1E; 
+            --input-bg: #2a2d30;
+            --accent-color: #03dac6; 
+            --accent-color-hover: #7fffd4; 
+            --border-color-base: #282a2c; 
+            --text-color-primary: #e8eaed; 
+            --text-color-secondary: #9aa0a6; 
+            --button-text-color: #0a0a0a;
+            --success-color: #38A169; 
+            --error-color: #E53E3E;   
+            --info-color: #00aeff; 
+            --mouse-track-area-bg: #101214;
+            --mouse-path-color: var(--accent-color);
+            --target-color: var(--accent-color);
+            --target-hit-color: var(--success-color);
+            --card-radius: 10px;
+            --spacing-unit: 16px; 
+            --shadow-base: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-primary); background-color: var(--bg-color); color: var(--text-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            padding: var(--spacing-unit); 
+        }
+
+        .app-container {
+            width: 100%; max-width: 800px; 
+            background-color: var(--card-bg);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-base);
+            border: 1px solid var(--border-color-base);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - (var(--spacing-unit) * 2)); 
+            position: relative;
+        }
+
+        header { text-align: center; margin-bottom: var(--spacing-unit); flex-shrink: 0; }
+        header h1 { font-size: 1.8em; font-weight: 600; margin: 0; }
+        .back-link {
+            position: absolute; top: calc(var(--spacing-unit)*1.2); right: calc(var(--spacing-unit)*1.2);
+            font-size: 0.8em; color: var(--accent-color); text-decoration: none;
+            font-weight: 500; transition: color 0.2s ease; display: flex; align-items: center;
+        }
+        .back-link:hover { color: var(--accent-color-hover); }
+        .back-link svg { width: 14px; height: 14px; margin-left: calc(var(--spacing-unit) * 0.4); fill: currentColor;}
+
+        .main-content {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.5); gap: var(--spacing-unit);
+        }
+        .main-content::-webkit-scrollbar { width: 5px; }
+        .main-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 3px;}
+        .main-content::-webkit-scrollbar-thumb { background: var(--border-color-base); border-radius: 3px;}
+        .main-content::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+
+        .mouse-module-section {
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); width: 100%; max-width: 500px; 
+        }
+        
+        #instructionText {
+            font-size: 0.95em; color: var(--text-color-secondary); margin-bottom: calc(var(--spacing-unit) * 0.5);
+            text-align: center; min-height: 2.5em; 
+        }
+        #instructionText strong { color: var(--accent-color); }
+
+        #mouseTrackingArea {
+            width: 100%; height: 250px;
+            background-color: var(--mouse-track-area-bg);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color-base);
+            margin-bottom: var(--spacing-unit);
+            position: relative; 
+            overflow: hidden; 
+            cursor: default;
+        }
+        #mousePathCanvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; 
+        }
+        .target-indicator {
+            position: absolute;
+            width: 24px; height: 24px;
+            background-color: var(--target-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px color-mix(in srgb, var(--target-color) 50%, transparent);
+            transition: background-color 0.1s ease, transform 0.1s ease;
+        }
+        .target-indicator:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+        
+        #statusMessage {
+            width: 100%; text-align: center; padding: calc(var(--spacing-unit) * 0.6);
+            border-radius: var(--card-radius); font-weight: 500; font-size: 0.85em;
+            min-height: calc(var(--spacing-unit) * 1.2 + 16px); background-color: rgba(0,0,0,0.2);
+            color: var(--text-color-secondary); border: 1px solid transparent;
+            transition: background-color 0.25s ease-out, color 0.25s ease-out, border-color 0.25s ease-out;
+        }
+        .status-success { background-color: rgba(56, 161, 105, 0.1); color: var(--success-color); border-color: var(--success-color); }
+        .status-error   { background-color: rgba(229, 62, 62, 0.1); color: var(--error-color); border-color: var(--error-color); }
+        .status-info    { background-color: rgba(0, 174, 255, 0.1); color: var(--info-color); border-color: var(--info-color); }
+
+        .actions-area {
+            display: grid; grid-template-columns: 1fr; 
+            gap: var(--spacing-unit); width: 100%; max-width: 700px; 
+            margin-top: var(--spacing-unit);
+        }
+        @media (min-width: 600px) { .actions-area { grid-template-columns: 1fr 1fr; } }
+
+        .action-group {
+            background-color: rgba(255,255,255,0.03); 
+            padding: calc(var(--spacing-unit) * 1.5); border-radius: var(--card-radius);
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); border: 1px solid var(--border-color-base);
+            min-height: 180px; justify-content: center; 
+        }
+        .action-group h2 { font-size: 1.2em; font-weight: 600; margin: 0 0 var(--spacing-unit) 0; color: var(--text-color-primary); }
+        
+        input[type="text"] {
+            background-color: var(--input-bg); border: 1px solid var(--border-color-base);
+            color: var(--text-color-primary); border-radius: var(--card-radius);
+            padding: calc(var(--spacing-unit) * 0.7); width: 100%; max-width: 220px;
+            text-align: center; font-size: 0.9em; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input[type="text"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(3, 218, 198, 0.2); }
+
+        .btn {
+            background-color: var(--accent-color); color: var(--button-text-color); border: none;
+            padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 1.8);
+            font-size: 0.9em; font-family: var(--font-primary); font-weight: 700;
+            border-radius: var(--card-radius); cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            display: inline-flex; align-items: center; justify-content:center; gap: calc(var(--spacing-unit) * 0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            min-width: 200px;
+        }
+        .btn:hover:not(:disabled) { background-color: var(--accent-color-hover); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:disabled { background-color: var(--border-color-base); color: var(--text-color-secondary); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        
+        .results-output { font-size: 0.9em; color: var(--text-color-primary); text-align: center; min-height: calc(var(--spacing-unit) * 1.5); margin-top:var(--spacing-unit); }
+        .results-output strong { color: var(--accent-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <a href="mainPage.html" class="back-link">
+             חזרה <svg viewBox="0 0 20 20"><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+        </a>
+        <header><h1>זיהוי תנועות עכבר</h1></header>
+        
+        <div class="main-content" id="mainContentWrapper">
+            <div class="mouse-module-section">
+                <p id="instructionText">לחץ על "התחל" ולאחר מכן לחץ על המטרות שיופיעו באזור למטה.</p>
+                <div id="mouseTrackingArea">
+                    <canvas id="mousePathCanvas"></canvas>
+                </div>
+                <div id="statusMessage" class="status-display">המתן להוראות...</div>
+            </div>
+            <div class="actions-area">
+                <div class="action-group">
+                    <h2>הוספה למאגר</h2>
+                    <input type="text" id="personName" placeholder="שם מלא">
+                    <button id="startRegistrationButton" class="btn">התחל רישום</button>
+                </div>
+                <div class="action-group">
+                    <h2>אימות תנועה</h2>
+                    <button id="startVerificationButton" class="btn">התחל אימות</button>
+                    <div class="results-output" id="verificationResults"></div>
+                </div>
+            </div>
+        </div> 
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const personNameInput = document.getElementById('personName');
+            const startRegistrationButton = document.getElementById('startRegistrationButton');
+            const startVerificationButton = document.getElementById('startVerificationButton');
+            const statusMessage = document.getElementById('statusMessage');
+            const verificationResults = document.getElementById('verificationResults');
+            const instructionText = document.getElementById('instructionText');
+            
+            const trackingArea = document.getElementById('mouseTrackingArea');
+            const pathCanvas = document.getElementById('mousePathCanvas');
+            const pathCtx = pathCanvas.getContext('2d');
+
+            let isTaskActive = false; 
+            let currentSegmentPath = []; 
+            let allSegmentFeaturesList = []; 
+            let recordedSignatures = []; 
+            
+            let currentTargetElement = null;
+            let currentTargetX, currentTargetY; 
+            let targetsClicked = 0;
+            const TOTAL_TARGETS_TO_CLICK = 10; // --- CHANGED: Increased number of targets
+            const TARGET_RADIUS = 12; 
+
+            const MIN_SEGMENT_POINTS = 5; 
+            const SIMILARITY_DISTANCE_THRESHOLD = 250000; 
+            const MAX_EXPECTED_DISTANCE = 500000; 
+
+            // --- ADDED: Predefined target positions (relative to tracking area dimensions)
+            const TARGET_POSITIONS = [
+                { relX: 0.2, relY: 0.2 },   // 1. Top-Left
+                { relX: 0.8, relY: 0.2 },   // 2. Top-Right
+                { relX: 0.8, relY: 0.8 },   // 3. Bottom-Right
+                { relX: 0.2, relY: 0.8 },   // 4. Bottom-Left
+                { relX: 0.5, relY: 0.5 },   // 5. Center
+                { relX: 0.5, relY: 0.15 },  // 6. Mid-Top
+                { relX: 0.5, relY: 0.85 },  // 7. Mid-Bottom
+                { relX: 0.15, relY: 0.5 },  // 8. Mid-Left
+                { relX: 0.85, relY: 0.5 },  // 9. Mid-Right
+                { relX: 0.35, relY: 0.35 }  // 10. Inner Top-Left quadrant
+            ];
+
+            function initializeApp() {
+                showStatus('מוכן להתחיל. לחץ על אחד הכפתורים.', 'info');
+                loadSignaturesFromDB();
+                setupCanvas();
+                updateUIState();
+            }
+
+            function setupCanvas() {
+                pathCanvas.width = trackingArea.clientWidth;
+                pathCanvas.height = trackingArea.clientHeight;
+                clearCanvas();
+            }
+
+            function clearCanvas() {
+                pathCtx.clearRect(0, 0, pathCanvas.width, pathCanvas.height);
+            }
+
+            function drawCurrentSegmentPath() {
+                if (currentSegmentPath.length < 2) return;
+                pathCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--mouse-path-color').trim();
+                pathCtx.lineWidth = 1.5;
+                pathCtx.beginPath();
+                pathCtx.moveTo(currentSegmentPath[0].x, currentSegmentPath[0].y);
+                for (let i = 1; i < currentSegmentPath.length; i++) {
+                    pathCtx.lineTo(currentSegmentPath[i].x, currentSegmentPath[i].y);
+                }
+                pathCtx.stroke();
+            }
+            
+            const handleMouseMoveForSegment = (event) => {
+                if (!isTaskActive || !currentTargetElement) return;
+                const rect = trackingArea.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                const t = Date.now();
+                if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+                    currentSegmentPath.push({ x, y, t });
+                }
+            };
+
+            function startTask(type) {
+                if (isTaskActive) return;
+                allSegmentFeaturesList = [];
+                targetsClicked = 0;
+                isTaskActive = true;
+                clearCanvas(); 
+                updateUIState();
+                verificationResults.innerHTML = '';
+                personNameInput.disabled = true;
+
+                instructionText.innerHTML = `לחץ על המטרות לפי סדר הופעתן. מטרה <strong id="targetCounter">1/${TOTAL_TARGETS_TO_CLICK}</strong>.`;
+                showStatus('משימת איסוף תנועות עכבר החלה...', 'info');
+                
+                spawnNewTarget();
+                trackingArea.addEventListener('mousemove', handleMouseMoveForSegment);
+            }
+
+            function spawnNewTarget() {
+                if (currentTargetElement) currentTargetElement.remove(); 
+                const areaWidth = trackingArea.clientWidth;
+                const areaHeight = trackingArea.clientHeight;
+
+                // --- CHANGED: Use predefined positions
+                if (targetsClicked < TARGET_POSITIONS.length) {
+                    const targetPos = TARGET_POSITIONS[targetsClicked];
+                    currentTargetX = targetPos.relX * areaWidth;
+                    currentTargetY = targetPos.relY * areaHeight;
+                } else {
+                    // Fallback if TOTAL_TARGETS_TO_CLICK > TARGET_POSITIONS.length (should not happen with current setup)
+                    console.warn("Not enough predefined target positions. Reverting to random or stopping.");
+                     // For safety, let's put it randomly if we run out of defined positions,
+                     // though ideally TOTAL_TARGETS_TO_CLICK and TARGET_POSITIONS.length match.
+                    const padding = TARGET_RADIUS * 2.5;
+                    currentTargetX = Math.random() * (areaWidth - 2 * padding) + padding;
+                    currentTargetY = Math.random() * (areaHeight - 2 * padding) + padding;
+                }
+
+                currentTargetElement = document.createElement('div');
+                currentTargetElement.className = 'target-indicator';
+                currentTargetElement.style.left = `${currentTargetX}px`;
+                currentTargetElement.style.top = `${currentTargetY}px`;
+                currentTargetElement.addEventListener('click', handleTargetClick);
+                trackingArea.appendChild(currentTargetElement);
+                currentSegmentPath = []; 
+            }
+            
+            function handleTargetClick(event) {
+                if (!isTaskActive || event.target !== currentTargetElement) return;
+                
+                // Process current segment BEFORE incrementing targetsClicked
+                if (currentSegmentPath.length >= MIN_SEGMENT_POINTS) {
+                    const features = extractFeaturesForSegment(currentSegmentPath, currentTargetX, currentTargetY);
+                    if (features) {
+                        allSegmentFeaturesList.push(features);
+                    }
+                }
+                drawCurrentSegmentPath(); 
+
+                currentTargetElement.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--target-hit-color').trim();
+                currentTargetElement.style.transform = 'translate(-50%, -50%) scale(0.8)';
+                
+                targetsClicked++; // Increment AFTER processing current target, so next spawnNewTarget uses correct index
+                if(document.getElementById('targetCounter')) {
+                    // Display target number as 1-based, up to TOTAL_TARGETS_TO_CLICK
+                    const displayTargetNum = Math.min(targetsClicked + 1, TOTAL_TARGETS_TO_CLICK);
+                    document.getElementById('targetCounter').textContent = `${displayTargetNum > TOTAL_TARGETS_TO_CLICK ? TOTAL_TARGETS_TO_CLICK : displayTargetNum}/${TOTAL_TARGETS_TO_CLICK}`;
+                    if (targetsClicked >= TOTAL_TARGETS_TO_CLICK) { // If all targets are clicked, reflect that
+                         document.getElementById('targetCounter').textContent = `${TOTAL_TARGETS_TO_CLICK}/${TOTAL_TARGETS_TO_CLICK}`;
+                    }
+                }
+
+                if (targetsClicked >= TOTAL_TARGETS_TO_CLICK) {
+                    setTimeout(() => finishTask(window.currentTaskType), 100); 
+                } else {
+                    setTimeout(spawnNewTarget, 150); 
+                }
+            }
+
+            function finishTask(type) {
+                isTaskActive = false;
+                trackingArea.removeEventListener('mousemove', handleMouseMoveForSegment);
+                if (currentTargetElement) currentTargetElement.remove();
+                currentTargetElement = null;
+                updateUIState();
+                personNameInput.disabled = false; 
+                instructionText.innerHTML = "לחץ על 'התחל' ולאחר מכן לחץ על המטרות שיופיעו באזור למטה.";
+
+                if (allSegmentFeaturesList.length < Math.ceil(TOTAL_TARGETS_TO_CLICK * 0.6) ) { 
+                    showStatus(`לא נאספו מספיק מקטעי תנועה תקינים. נסה שוב. (נאספו ${allSegmentFeaturesList.length})`, 'error');
+                    return;
+                }
+                showStatus('מעבד נתוני תנועה...', 'info');
+                
+                setTimeout(() => { 
+                    const aggregatedFeatures = aggregateSegmentFeatures(allSegmentFeaturesList);
+                    if (!aggregatedFeatures) {
+                         showStatus('שגיאה בעיבוד התנועה. נסה שוב.', 'error'); return;
+                    }
+                    if (type === 'registration') {
+                        const name = personNameInput.value.trim();
+                        recordedSignatures.push({ name, aggregatedFeatures });
+                        saveSignaturesToDB();
+                        showStatus(`חתימת תנועה עבור <strong>${name}</strong> נשמרה בהצלחה!`, 'success');
+                        personNameInput.value = '';
+                    } else if (type === 'verification') {
+                        verifySignature(aggregatedFeatures);
+                    }
+                }, 50);
+            }
+
+            function extractFeaturesForSegment(path, targetX, targetY) {
+                if (!path || path.length < 2) return null;
+
+                let totalDistance = 0;
+                for (let i = 1; i < path.length; i++) {
+                    const dx = path[i].x - path[i-1].x;
+                    const dy = path[i].y - path[i-1].y;
+                    totalDistance += Math.sqrt(dx*dx + dy*dy);
+                }
+
+                const duration = path[path.length-1].t - path[0].t;
+                if (duration <= 10) return null; 
+
+                const numPoints = path.length;
+                const firstPoint = path[0]; 
+                const lastPoint = path[path.length-1]; 
+
+                const clickOffsetX = lastPoint.x - targetX;
+                const clickOffsetY = lastPoint.y - targetY;
+                const clickAccuracyDistance = Math.sqrt(clickOffsetX*clickOffsetX + clickOffsetY*clickOffsetY);
+
+                const endToEndDx = targetX - firstPoint.x;
+                const endToEndDy = targetY - firstPoint.y;
+                const endToEndDistance = Math.sqrt(endToEndDx*endToEndDx + endToEndDy*endToEndDy);
+                
+                const avgSpeed = totalDistance / (duration / 1000); 
+                const pathStraightness = (totalDistance > 0) ? (endToEndDistance / totalDistance) : 1; 
+
+                let totalAngleChange = 0;
+                let velocities = [];
+                if (path.length >= 2) {
+                     for (let i = 1; i < path.length; i++) {
+                        const dx = path[i].x - path[i-1].x;
+                        const dy = path[i].y - path[i-1].y;
+                        const dt = (path[i].t - path[i-1].t) / 1000; 
+                        if (dt > 0) {
+                           velocities.push(Math.sqrt(dx*dx + dy*dy) / dt);
+                        }
+                     }
+                }
+                const avgVelocityFromSamples = velocities.length > 0 ? velocities.reduce((a,b) => a+b,0) / velocities.length : avgSpeed;
+                const stdDevVelocity = velocities.length > 1 ? Math.sqrt(velocities.map(v => Math.pow(v - avgVelocityFromSamples, 2)).reduce((a,b) => a+b,0) / (velocities.length -1)) : 0;
+
+
+                if (path.length >= 3) {
+                    for (let i = 1; i < path.length - 1; i++) {
+                        const v1x = path[i].x - path[i-1].x; const v1y = path[i].y - path[i-1].y;
+                        const v2x = path[i+1].x - path[i].x; const v2y = path[i+1].y - path[i].y;
+                        const angle1 = Math.atan2(v1y, v1x); const angle2 = Math.atan2(v2y, v2x);
+                        let angleDiff = angle2 - angle1;
+                        while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                        while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+                        totalAngleChange += Math.abs(angleDiff);
+                    }
+                }
+                const averageCurvature = (path.length > 2) ? totalAngleChange / (path.length - 2) : 0;
+                
+                return [ 
+                    totalDistance,      
+                    duration,           
+                    numPoints,          
+                    avgSpeed,  
+                    stdDevVelocity,     
+                    pathStraightness,   
+                    averageCurvature,   
+                    clickAccuracyDistance 
+                ]; 
+            }
+
+            function aggregateSegmentFeatures(allSegments) {
+                if (!allSegments || allSegments.length === 0) return null;
+                
+                const numFeaturesPerSegment = allSegments[0].length;
+                const aggregatedMeans = new Array(numFeaturesPerSegment).fill(0);
+                // const aggregatedStdDevs = new Array(numFeaturesPerSegment).fill(0); // Kept for potential future use
+
+                for (const segmentFeatures of allSegments) {
+                    for (let i = 0; i < numFeaturesPerSegment; i++) {
+                        aggregatedMeans[i] += segmentFeatures[i];
+                    }
+                }
+                for (let i = 0; i < numFeaturesPerSegment; i++) {
+                    aggregatedMeans[i] /= allSegments.length;
+                }
+                
+                return aggregatedMeans; 
+            }
+
+            function verifySignature(newAggregatedFeatures) {
+                if (recordedSignatures.length === 0) {
+                    verificationResults.innerHTML = 'המאגר ריק. יש להוסיף חתימות תנועה תחילה.';
+                    showStatus('לא ניתן לאמת - מאגר החתימות ריק.', 'info'); return;
+                }
+                let bestMatch = null;
+                let minDistance = Infinity;
+
+                for (const entry of recordedSignatures) {
+                    const distance = euclideanDistanceSquared(newAggregatedFeatures, entry.aggregatedFeatures);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestMatch = entry;
+                    }
+                }
+                
+                let similarityPercentage = 0;
+                if (minDistance < MAX_EXPECTED_DISTANCE) { 
+                    similarityPercentage = Math.max(0, (1 - (minDistance / MAX_EXPECTED_DISTANCE)) * 100);
+                }
+
+                if (bestMatch && minDistance < SIMILARITY_DISTANCE_THRESHOLD) { 
+                    verificationResults.innerHTML = `זיהוי הצליח: <strong>${bestMatch.name}</strong><br>(דמיון: ${similarityPercentage.toFixed(1)}%, מרחק: ${minDistance.toFixed(0)})`;
+                    showStatus('אימות הושלם - זוהתה התאמה.', 'success');
+                } else if (bestMatch) {
+                     verificationResults.innerHTML = `לא זוהתה התאמה ודאית. הקרוב ביותר: ${bestMatch.name}<br>(דמיון: ${similarityPercentage.toFixed(1)}%, מרחק: ${minDistance.toFixed(0)})`;
+                     showStatus('אימות הושלם - לא נמצאה התאמה מספקת.', 'info');
+                } else { 
+                    verificationResults.innerHTML = 'לא נמצאה התאמה במאגר.';
+                    showStatus('אימות הושלם - לא נמצאה התאמה.', 'info');
+                }
+            }
+            
+            function euclideanDistanceSquared(vecA, vecB) {
+                if (!vecA || !vecB || vecA.length !== vecB.length) return Infinity;
+                let sum = 0;
+                for (let i = 0; i < vecA.length; i++) {
+                    const diff = vecA[i] - vecB[i];
+                    sum += (diff * diff);
+                }
+                return sum;
+            }
+
+            function showStatus(message, type = 'info') {
+                statusMessage.innerHTML = message;
+                statusMessage.className = `status-display status-${type}`;
+            }
+            
+            function updateUIState() {
+                const disableButtons = isTaskActive;
+                startRegistrationButton.disabled = disableButtons;
+                startVerificationButton.disabled = disableButtons;
+                if (isTaskActive) {
+                    startRegistrationButton.textContent = "מבצע משימה...";
+                    startVerificationButton.textContent = "מבצע משימה...";
+                } else {
+                    startRegistrationButton.textContent = "התחל רישום";
+                    startVerificationButton.textContent = "התחל אימות";
+                }
+            }
+
+            function saveSignaturesToDB() {
+                try { localStorage.setItem('mouseSignaturesDB_tasks_v2', JSON.stringify(recordedSignatures)); }
+                catch (e) { console.error("Error saving to DB:", e); showStatus("שגיאה בשמירה.", "error");}
+            }
+
+            function loadSignaturesFromDB() {
+                const data = localStorage.getItem('mouseSignaturesDB_tasks_v2');
+                if (data) {
+                    try {
+                        const parsedData = JSON.parse(data);
+                         if (Array.isArray(parsedData)) {
+                           recordedSignatures = parsedData.filter(entry => entry.aggregatedFeatures && Array.isArray(entry.aggregatedFeatures));
+                        } else { recordedSignatures = []; }
+                    } catch (e) {
+                        console.error("Error parsing data from DB", e);
+                        localStorage.removeItem('mouseSignaturesDB_tasks_v2'); recordedSignatures = [];
+                    }
+                }
+            }
+            
+            window.currentTaskType = null; 
+            startRegistrationButton.addEventListener('click', () => {
+                if (isTaskActive) return;
+                const name = personNameInput.value.trim();
+                if (!name) { showStatus('אנא הזן שם.', 'error'); personNameInput.focus(); return; }
+                if (recordedSignatures.find(entry => entry.name === name)) {
+                     showStatus(`שם '${name}' כבר קיים.`, 'error'); personNameInput.focus(); return;
+                }
+                window.currentTaskType = 'registration';
+                startTask('registration');
+            });
+            startVerificationButton.addEventListener('click', () => {
+                if (isTaskActive) return;
+                window.currentTaskType = 'verification';
+                startTask('verification');
+            });
+            window.addEventListener('resize', setupCanvas);
+            initializeApp();
+        });
+    </script>
+</body>
+</html>

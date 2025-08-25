@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת זיהוי ביומטרי - פורטל ראשי משודרג</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D1117;
+            --card-bg-gradient-start: #202731; 
+            --card-bg-gradient-end: #161B22;
+            --accent-color-primary: #03dac6;
+            --accent-color-primary-darker: #02b8a3;
+            --accent-glow: rgba(3, 218, 198, 0.25); 
+            --accent-glow-intense: rgba(3, 218, 198, 0.4);
+            --text-color-primary: #e6edf3;
+            --text-color-secondary: #bdc6cf;
+            --text-color-tertiary: #89929b;
+            --icon-color: var(--accent-color-primary);
+            --card-bg-hover-start: #222831;
+            --card-bg-hover-end: #1A1F26;
+            --card-border-color: rgba(3, 218, 198, 0.18);
+            --card-border-hover-color: var(--accent-color-primary);
+            --shadow-base: 0 4px 14px rgba(0, 0, 0, 0.26); 
+            --shadow-hover: 0 8px 26px rgba(0, 0, 0, 0.36); 
+            --shadow-highlight: 0 0 16px var(--accent-glow);
+            --card-radius: 12px; /* Increased */
+            --spacing-unit: 16px; /* Increased */
+            --transition-duration: 0.3s;
+            --transition-duration-medium: 0.4s;
+            --transition-duration-long: 0.5s;
+            --transition-easing: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --content-bg-color: #12171d;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            font-size: 16px; 
+            scroll-behavior: smooth;
+            min-height: 100vh; 
+        }
+
+        body {
+            font-family: var(--font-primary);
+            background-color: var(--bg-color);
+            color: var(--text-color-primary);
+            min-height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            opacity: 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            line-height: 1.6; 
+            overflow-x: hidden; 
+            overflow-y: auto;   
+        }
+        
+        body::before { 
+            content: ""; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><filter id="n" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.025"/></svg>');
+            pointer-events: none; z-index: -1; opacity: 0.3;
+        }
+        
+        body::after { 
+            content: ''; position: fixed;
+            top: 50%; left: 50%;
+            width: 1200px; height: 1200px;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(3, 218, 198, 0.025) 0%, transparent 65%); 
+            pointer-events: none; z-index: -2; opacity: 0.85;
+        }
+
+        .site-container {
+            display: flex; flex-direction: column; 
+            flex-grow: 1; 
+            width: 100%; max-width: 1250px; 
+            margin: 0 auto; 
+            padding: 0 var(--spacing-unit);
+        }
+        
+        .site-header {
+            padding: calc(var(--spacing-unit) * 1.4) 0; 
+            text-align: center;
+            opacity: 1; transform: translateY(0);
+            transition: opacity var(--transition-duration-medium) var(--transition-easing), transform var(--transition-duration-medium) var(--transition-easing), height var(--transition-duration-medium) var(--transition-easing), padding var(--transition-duration-medium) var(--transition-easing);
+            will-change: opacity, transform, height, padding;
+            flex-shrink: 0; 
+        }
+
+        .site-header__title {
+            font-size: 2.4rem; 
+            font-weight: 800; color: var(--text-color-primary);
+            letter-spacing: 0.1px; margin-bottom: calc(var(--spacing-unit) * 0.4); 
+            text-shadow: 0 0 11px var(--accent-glow), 0 0 3.5px var(--accent-glow-intense); 
+        }
+        .site-header__subtitle {
+            font-size: 1.1rem; 
+            font-weight: 400; 
+            color: var(--text-color-secondary);
+            max-width: 620px; margin: 0 auto; line-height: 1.6;
+        }
+
+        main {
+            flex-grow: 1; 
+            display: flex; 
+            flex-direction: column; 
+            /* justify-content: center; /* REMOVED */
+            align-items: center; 
+            position: relative; 
+            padding: calc(var(--spacing-unit) * 2.5) 0 calc(var(--spacing-unit) * 1.5) 0; 
+            width: 100%;
+        }
+
+        .modules-grid {
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); 
+            gap: calc(var(--spacing-unit) * 1.9); 
+            perspective: 1000px; 
+            transition: opacity var(--transition-duration-medium) var(--transition-easing), transform var(--transition-duration-medium) var(--transition-easing), visibility 0s var(--transition-duration-medium);
+            will-change: opacity, transform;
+            visibility: visible;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px; 
+        }
+
+        body.module-view-active .site-header,
+        body.module-view-active .modules-grid {
+            opacity: 0;
+            transform: scale(0.96) translateY(-15px); 
+            pointer-events: none;
+            visibility: hidden;
+            height: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: hidden;
+        }
+
+        .module-card {
+            background: linear-gradient(135deg, var(--card-bg-gradient-start), var(--card-bg-gradient-end)); 
+            border-radius: var(--card-radius); 
+            padding: calc(var(--spacing-unit) * 1.4);  
+            box-shadow: var(--shadow-base); border: 1px solid var(--card-border-color); 
+            text-decoration: none; color: var(--text-color-primary);
+            display: flex; flex-direction: column; justify-content: space-between;
+            min-height: 205px;  
+            position: relative; overflow: hidden;
+            transition: 
+                transform var(--transition-duration) var(--transition-easing), 
+                box-shadow var(--transition-duration) var(--transition-easing),
+                border-color var(--transition-duration) var(--transition-easing);
+            cursor: pointer;
+            opacity: 1; transform: scale(1) translateY(0) rotateX(0deg); 
+            will-change: transform, box-shadow, border-color;
+        }
+        
+        .module-card::before { 
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: inherit; pointer-events: none;
+            background: radial-gradient(600px circle at var(--mouse-x) var(--mouse-y), rgba(3, 218, 198, 0.11), transparent 42%); 
+            opacity: 0; transition: opacity 0.4s var(--transition-easing);
+            will-change: opacity;
+        }
+        .module-card:hover::before, .module-card:focus-visible::before { opacity: 1; }
+        
+        .module-card::after { 
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 2px; 
+            background: linear-gradient(90deg, transparent, var(--accent-color-primary), transparent);
+            transform: scaleX(0); transform-origin: center;
+            transition: transform 0.4s var(--transition-easing) 0.05s; 
+            will-change: transform;
+        }
+
+        .module-card:hover, .module-card:focus-visible {
+            transform: translateY(-5px) scale(1.02) rotateX(0.5deg); 
+            box-shadow: var(--shadow-hover), var(--shadow-highlight);
+            border-color: var(--card-border-hover-color);
+        }
+        .module-card:hover::after { transform: scaleX(0.8); } 
+        .module-card:focus-visible { outline: 2px solid var(--accent-color-primary); outline-offset: 3px; }
+        
+        .module-card__icon-wrapper { text-align: center; margin-bottom: calc(var(--spacing-unit) * 0.5); padding-top: calc(var(--spacing-unit)*0.1); } 
+        .module-card__icon svg {
+            width: 42px; height: 42px; 
+            fill: var(--icon-color);
+            transition: transform var(--transition-duration) var(--transition-easing), filter var(--transition-duration) var(--transition-easing);
+            will-change: transform, filter;
+        }
+        .module-card:hover .module-card__icon svg, .module-card:focus-visible .module-card__icon svg {
+            transform: scale(1.1) rotate(-2deg); filter: drop-shadow(0 0 5px var(--accent-glow-intense)); 
+        }
+        .module-card__title {
+            font-size: 1.35rem; 
+            font-weight: 700; 
+            margin-bottom: calc(var(--spacing-unit) * 0.4); 
+            text-align: center; color: var(--text-color-primary);
+        }
+        .module-card__description {
+            font-size: 0.9rem; 
+            font-weight: 400; 
+            line-height: 1.5; color: var(--text-color-secondary);
+            text-align: center; margin-bottom: 0; flex-grow: 1;
+        }
+        .module-card__cta-arrow { display: block; width: 100%; text-align: center; margin-top: calc(var(--spacing-unit) * 0.7); padding-bottom: 0;}
+        .module-card__cta-arrow svg {
+            width: 20px; height: 20px; 
+            fill: var(--text-color-tertiary);
+            transition: fill var(--transition-duration) var(--transition-easing), transform var(--transition-duration) var(--transition-easing);
+            will-change: fill, transform;
+        }
+        .module-card:hover .module-card__cta-arrow svg, .module-card:focus-visible .module-card__cta-arrow svg { fill: var(--accent-color-primary); transform: translateX(-3px); } 
+
+        .module-card.disabled { 
+            background: linear-gradient(145deg, #1a1a20, #131318) !important; cursor: not-allowed;
+            opacity: 0.5 !important; border-color: rgba(120,130,140,0.2) !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important; 
+        }
+        .module-card.disabled::before, .module-card.disabled::after { display: none !important; }
+        .module-card.disabled:hover, .module-card.disabled:focus-visible { transform: none !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important; outline: none !important; }
+        .module-card.disabled .module-card__icon svg { transform: none !important; filter: none !important; fill: var(--text-color-tertiary) !important; }
+        .module-card.disabled .module-card__title, .module-card.disabled .module-card__description { color: var(--text-color-tertiary); }
+        .module-card.disabled .module-card__cta-arrow svg { fill: var(--text-color-tertiary) !important; transform: none !important; }
+
+        .module-content-area {
+            position: relative; 
+            width: 100%;
+            /* min-height: 280px; /* REMOVED */
+            /* flex-grow: 1; /* REMOVED */
+            display: flex; 
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .module-content {
+            background-color: var(--content-bg-color);
+            border-radius: var(--card-radius);
+            padding: calc(var(--spacing-unit) * 1.9) calc(var(--spacing-unit) * 2.3); 
+            border: 1px solid var(--card-border-color);
+            box-shadow: var(--shadow-base);
+            opacity: 0;
+            transform: translateY(25px) scale(0.98); 
+            transition: opacity var(--transition-duration-long) var(--transition-easing), transform var(--transition-duration-long) var(--transition-easing);
+            will-change: opacity, transform;
+            display: none; position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            overflow-y: auto; 
+        }
+        
+        .module-content.active {
+            display: block; opacity: 1;
+            transform: translateY(0) scale(1);
+            position: relative; 
+        }
+
+        .module-content__title {
+            font-size: 1.9rem; 
+            font-weight: 700; color: var(--accent-color-primary);
+            margin-bottom: calc(var(--spacing-unit)*0.8); 
+            padding-bottom: calc(var(--spacing-unit)*0.6); 
+            border-bottom: 1px solid var(--card-border-color);
+        }
+        .module-content__description {
+            font-size: 1.05rem; 
+            line-height: 1.65; color: var(--text-color-secondary);
+            margin-bottom: var(--spacing-unit); 
+            max-width: 750px; 
+        }
+        .module-content__placeholder {
+            background-color: rgba(255,255,255,0.025); 
+            padding: calc(var(--spacing-unit)*0.9); border-radius: 6px; 
+            min-height: 80px; 
+            display: flex; align-items: center; justify-content: center;
+            color: var(--text-color-tertiary); font-style: italic; margin-bottom: calc(var(--spacing-unit)*0.9); 
+            border: 1px dashed rgba(var(--accent-color-primary-rgb), 0.12); 
+        }
+
+        .back-button {
+            display: inline-flex; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.55) calc(var(--spacing-unit) * 1.1); 
+            background-color: var(--accent-color-primary-darker); color: var(--bg-color);
+            border: none; border-radius: calc(var(--card-radius) - 2px); 
+            font-family: var(--font-primary); font-size: 0.9rem; 
+            font-weight: 600;
+            text-decoration: none; cursor: pointer;
+            transition: background-color var(--transition-duration) var(--transition-easing), transform var(--transition-duration) var(--transition-easing);
+            margin-top: var(--spacing-unit); 
+        }
+        .back-button:hover, .back-button:focus-visible {
+            background-color: var(--accent-color-primary);
+            transform: scale(1.04); 
+            outline: 2px solid var(--accent-color-primary);
+            outline-offset: 2px; 
+        }
+        .back-button svg {
+            width: 18px; height: 18px; 
+            fill: currentColor;
+            margin-right: calc(var(--spacing-unit) * 0.4); 
+            transform: scaleX(-1);
+        }
+        
+        .site-footer {
+            padding: var(--spacing-unit) 0; 
+            text-align: center;
+            font-size: 0.8rem; 
+            color: var(--text-color-tertiary);
+            border-top: 1px solid rgba(220, 230, 240, 0.08); 
+            opacity: 1; transform: translateY(0);
+            transition: opacity var(--transition-duration-medium) var(--transition-easing), transform var(--transition-duration-medium) var(--transition-easing), visibility 0s var(--transition-duration-medium);
+            will-change: opacity, transform;
+            visibility: visible;
+            flex-shrink: 0; 
+        }
+
+        body.module-view-active .site-footer {
+           opacity: 0;
+           transform: translateY(10px); 
+           visibility: hidden;
+           pointer-events: none;
+        }
+
+        @media (max-width: 1260px) { 
+             .site-container {
+                max-width: 100%; 
+             }
+        }
+
+        @media (max-width: 1140px) { 
+            .modules-grid { 
+                grid-template-columns: repeat(auto-fit, minmax(225px, 1fr)); 
+                gap: calc(var(--spacing-unit) * 1.5); 
+            }
+             .module-card { padding: calc(var(--spacing-unit) * 1.2); min-height: 195px;} 
+        }
+
+        @media (max-width: 992px) { 
+             .modules-grid { 
+                grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); 
+                gap: var(--spacing-unit);
+             }
+            .site-header__title { font-size: 2rem; }
+            .module-card {min-height: 180px;} 
+        }
+        @media (max-width: 768px) { 
+            html { font-size: 15.5px; } 
+            .site-header { padding: var(--spacing-unit) 0; }
+            .site-header__title { font-size: 1.8rem; } .site-header__subtitle { font-size: 0.95rem; }
+            .modules-grid {
+                 grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); 
+                 gap: var(--spacing-unit);
+            }
+            .module-card { min-height: auto; padding: var(--spacing-unit); } 
+            .module-card__icon svg { width: 38px; height: 38px; } 
+            .module-card__title { font-size: 1.2rem; } 
+        }
+        @media (max-width: 480px) { 
+            html { font-size: 15px; } 
+            .site-container { padding: 0 calc(var(--spacing-unit)*0.5); }
+            .site-header { padding-top: var(--spacing-unit); padding-bottom: var(--spacing-unit); }
+            .site-header__title { font-size: 1.6rem; } .site-header__subtitle { font-size: 0.85rem; }
+            .modules-grid { 
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
+                gap: calc(var(--spacing-unit)*0.8); 
+            }
+             .module-card { padding: calc(var(--spacing-unit)*0.9); }
+             .module-card__title { font-size: 1.1rem; } 
+             .module-card__description { font-size: 0.75rem; }
+             .module-card__icon svg { width: 36px; height: 36px; } 
+        }
+         @media (max-height: 650px) { 
+            .site-container { height: auto; min-height: 100vh; } 
+            main { 
+                /* justify-content: flex-start; /* This is now default behavior */
+                padding-top: var(--spacing-unit); 
+                padding-bottom: var(--spacing-unit); 
+            }
+        }
+    </style>
+</head>
+<body>
+    <audio id="sound-card-click" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" preload="auto"></audio>
+    <audio id="sound-content-show" src="data:audio/wav;base64,UklGRhwAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAK" preload="auto"></audio>
+    <audio id="sound-back-click" src="data:audio/wav;base64,UklGRiIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAC" preload="auto"></audio>
+
+    <div class="site-container">
+        <header class="site-header">
+            <h1 class="site-header__title">מערכת זיהוי ביומטרי</h1>
+            <p class="site-header__subtitle">בחר את מודול הזיהוי הרצוי מתוך האפשרויות המתקדמות שלנו.</p>
+        </header>
+
+        <main>
+            <nav class="modules-grid">
+                <!-- כרטיסיית זיהוי פנים -->
+                <a href="javascript:void(0);" class="module-card" data-custom-link="קישור-לדף-זיהוי-פנים.html" aria-labelledby="face-recognition-heading" role="button">
+                    <div class="module-card__icon-wrapper">
+                        <span class="module-card__icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 13.5c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08s5.97 1.09 6 3.08c-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+                        </span>
+                    </div>
+                    <div>
+                        <h2 class="module-card__title" id="face-recognition-heading">זיהוי פנים</h2>
+                        <p class="module-card__description">אימות מאובטח באמצעות ניתוח תווי פנים ייחודיים.</p>
+                    </div>
+                    <span class="module-card__cta-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H16a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </span>
+                </a>
+
+                <!-- כרטיסיית זיהוי קולי -->
+                <a href="javascript:void(0);" class="module-card" data-custom-link="קישור-לדף-זיהוי-קולי.html" aria-labelledby="voice-recognition-heading" role="button">
+                    <div class="module-card__icon-wrapper">
+                        <span class="module-card__icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+                        </span>
+                    </div>
+                     <div>
+                        <h2 class="module-card__title" id="voice-recognition-heading">זיהוי קולי</h2>
+                        <p class="module-card__description">זיהוי אישי המבוסס על חתימת קול ואנליזת דיבור.</p>
+                    </div>
+                     <span class="module-card__cta-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H16a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </span>
+                </a>
+
+                <!-- כרטיסיית זיהוי תנועות עכבר -->
+                 <a href="javascript:void(0);" class="module-card" data-custom-link="קישור-לדף-זיהוי-עכבר.html" aria-labelledby="mouse-movement-heading" role="button">
+                    <div class="module-card__icon-wrapper">
+                        <span class="module-card__icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M13.73 5.83l-1.42 1.42L15.17 10H4v2h11.17l-2.86 2.86 1.42 1.42L20 11l-6.27-5.17zM12 16.5c-1.82 0-3.44-.95-4.37-2.42l-1.46.88C7.29 16.97 9.48 18.5 12 18.5s4.71-1.53 5.83-3.54l-1.46-.88C15.44 15.55 13.82 16.5 12 16.5z"/></svg>
+                        </span>
+                    </div>
+                    <div>
+                        <h2 class="module-card__title" id="mouse-movement-heading">דינמיקת עכבר</h2>
+                        <p class="module-card__description">אנליזה התנהגותית של דפוסי תנועת עכבר ייחודיים.</p>
+                    </div>
+                    <span class="module-card__cta-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H16a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </span>
+                </a>
+                
+                <!-- כרטיסיית זיהוי הקלדה -->
+                <a href="javascript:void(0);" class="module-card" data-custom-link="קישור-לדף-זיהוי-הקלדה.html" aria-labelledby="typing-recognition-heading" role="button">
+                    <div class="module-card__icon-wrapper">
+                        <span class="module-card__icon">
+                             <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zm-3 0h2v2H8v-2zm-3 0h2v2H5v-2zm3-3h2v2H8V8zm3 6h8v2H8v-2zm0-3h2v2H8v-2zm3 0h2v2h-2v-2zm3-3h2v2h-2V8zm0 3h2v2h-2v-2z"/></svg>
+                        </span>
+                    </div>
+                    <div>
+                        <h2 class="module-card__title" id="typing-recognition-heading">סגנון הקלדה</h2>
+                        <p class="module-card__description">אימות המבוסס על ניתוח קצב ודיוק ההקלדה האישי.</p>
+                    </div>
+                    <span class="module-card__cta-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H16a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </span>
+                </a>
+
+                <!-- כרטיסיית זיהוי משחק -->
+                <a href="javascript:void(0);" class="module-card" data-custom-link="קישור-לדף-זיהוי-משחק.html" aria-labelledby="game-recognition-heading" role="button">
+                    <div class="module-card__icon-wrapper">
+                        <span class="module-card__icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M0 0h24v24H0V0z" fill="none"/>
+                                <path d="M21.02 10.82l-3.84-2.01c-.16-.08-.34-.12-.53-.12H7.34c-.19 0-.38.04-.53.12L3 10.82c-.63.33-.78 1.14-.34 1.77.31.45.83.71 1.38.71h1.62v2.66H3.34c-.69 0-1.25.56-1.25 1.25S2.65 18.5 3.34 18.5h17.32c.69 0 1.25-.56 1.25-1.25s-.56-1.25-1.25-1.25H18v-2.66h1.65c.55 0 1.07-.26 1.38-.71.44-.63.29-1.44-.31-1.77zm-10.27 2.9H6.86v-1.74h3.89v1.74zm5.73 0h-3.89v-1.74h3.89v1.74zM12 3.5C6.48 3.5 2 6.24 2 9.75v1.5C2 13.13 3.58 15 6 15h1v-1.5H6c-1.38 0-2.5-1.01-2.5-2.25v-1.5C3.5 7.37 7.26 5 12 5s8.5 2.37 8.5 5.25v1.5c0 1.24-1.12 2.25-2.5 2.25h-1V15h1c2.42 0 4-1.87 4-3.75v-1.5C22 6.24 17.52 3.5 12 3.5z"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div>
+                        <h2 class="module-card__title" id="game-recognition-heading">זיהוי משחק</h2>
+                        <p class="module-card__description">מערכת לזיהוי פעילות ודפוסים הקשורים למשחקי מחשב.</p>
+                    </div>
+                    <span class="module-card__cta-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H16a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </span>
+                </a>
+
+                <!-- כרטיסיית זיהוי חתימה -->
+                <a href="javascript:void(0);" class="module-card" data-custom-link="קישור-לדף-זיהוי-חתימה.html" aria-labelledby="signature-recognition-heading" role="button">
+                    <div class="module-card__icon-wrapper">
+                        <span class="module-card__icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M14.06 9.02l.92.92L5.92 19H5v-.92l9.06-9.06M17.66 3c-.26 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75z"/></svg>
+                        </span>
+                    </div>
+                    <div>
+                        <h2 class="module-card__title" id="signature-recognition-heading">זיהוי חתימה</h2>
+                        <p class="module-card__description">אימות באמצעות ניתוח חתימה דיגיטלית או סרוקה.</p>
+                    </div>
+                    <span class="module-card__cta-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H16a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </span>
+                </a>
+
+                <!-- כרטיסיית זיהוי גאומטריית כף יד -->
+                <a href="javascript:void(0);" class="module-card" data-custom-link="קישור-לדף-זיהוי-כף-יד.html" aria-labelledby="hand-geometry-heading" role="button">
+                    <div class="module-card__icon-wrapper">
+                        <span class="module-card__icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M18.5 6C16.57 6 15 7.57 15 9.5V18c0 .55.45 1 1 1h5c.55 0 1-.45 1-1v-8.5c0-1.93-1.57-3.5-3.5-3.5zM20 18h-3v-8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5V18zm-9-1.5c0-1.68-.91-3.13-2.24-3.85C8.07 12.24 7.5 11.49 7.5 10.64V6.5c0-1.38-1.12-2.5-2.5-2.5S2.5 5.12 2.5 6.5v4.14c0 .85-.57 1.6-1.26 2.03C.57 13.09 0 14.06 0 15.15V18c0 .55.45 1 1 1h5c.55 0 1-.45 1-1v-2.85c0-1.68-.91-3.13-2.24-3.85C4.07 11.92 3.5 11.17 3.5 10.32V6.5c0-.83.67-1.5 1.5-1.5S6.5 5.67 6.5 6.5v3.82c0 .85.57 1.6 1.26 2.03.67.42 1.24 1.39 1.24 2.48V16.5z"/></svg>
+                        </span>
+                    </div>
+                    <div>
+                        <h2 class="module-card__title" id="hand-geometry-heading">גאומטריית כף יד</h2>
+                        <p class="module-card__description">מדידת מאפיינים גאומטריים של כף היד והאצבעות.</p>
+                    </div>
+                    <span class="module-card__cta-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H16a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </span>
+                </a>
+
+                <!-- כרטיסיית סריקת עין -->
+                <a href="javascript:void(0);" class="module-card" data-custom-link="קישור-לדף-סריקת-עין.html" aria-labelledby="eye-scan-heading" role="button">
+                    <div class="module-card__icon-wrapper">
+                        <span class="module-card__icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M12 4C7 4 2.73 7.11 1 11.5 2.73 15.89 7 19 12 19s9.27-3.11 11-7.5C21.27 7.11 17 4 12 4zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                        </span>
+                    </div>
+                    <div>
+                        <h2 class="module-card__title" id="eye-scan-heading">סריקת עין</h2>
+                        <p class="module-card__description">זיהוי מאובטח באמצעות דפוס הקשתית או הרשתית.</p>
+                    </div>
+                    <span class="module-card__cta-arrow">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H16a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </span>
+                </a>
+            </nav>
+
+            <div class="module-content-area">
+                <!-- תוכן מודול זיהוי פנים -->
+                <section id="content-face-recognition" class="module-content" aria-labelledby="face-recognition-content-title" tabindex="-1">
+                    <h3 class="module-content__title" id="face-recognition-content-title">מודול זיהוי פנים</h3>
+                    <p class="module-content__description">המערכת משתמשת באלגוריתמים מתקדמים לזיהוי תווי פנים ייחודיים, ומספקת אימות מהיר ומאובטח. תהליך זה כולל זיהוי פנים, ניתוח מרחקים וזוויות, והשוואה למאגר נתונים מאובטח.</p>
+                    <div class="module-content__placeholder">מקום להדגמה אינטראקטיבית של זיהוי פנים, סטטוסים, או מידע נוסף...</div>
+                    <button class="back-button" data-target-grid="modules-grid">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                        חזור
+                    </button>
+                </section>
+
+                <!-- תוכן מודול זיהוי קולי -->
+                <section id="content-voice-recognition" class="module-content" aria-labelledby="voice-recognition-content-title" tabindex="-1">
+                    <h3 class="module-content__title" id="voice-recognition-content-title">מודול זיהוי קולי</h3>
+                    <p class="module-content__description">אימות באמצעות "טביעת קול" ייחודית. המערכת מנתחת מאפיינים אקוסטיים ופונטיים של הדיבור, כגון גובה טון, קצב דיבור, ומבטא, כדי לאשר את זהות המשתמש.</p>
+                    <div class="module-content__placeholder">כאן תוכלו להוסיף ממשק הקלטה, ויזואליזציה של גלי קול, או תוצאות ניתוח קולי.</div>
+                     <button class="back-button" data-target-grid="modules-grid">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                        חזור
+                    </button>
+                </section>
+
+                <!-- תוכן מודול דינמיקת עכבר -->
+                 <section id="content-mouse-movement" class="module-content" aria-labelledby="mouse-movement-content-title" tabindex="-1">
+                    <h3 class="module-content__title" id="mouse-movement-content-title">מודול דינמיקת עכבר</h3>
+                    <p class="module-content__description">זיהוי התנהגותי המבוסס על דפוסי תנועת עכבר אישיים. המערכת לומדת את סגנון השימוש שלך בעכבר – מהירות, דיוק, עקמומיות התנועה ועצירות – כדי לאמת אותך באופן פסיבי.</p>
+                    <div class="module-content__placeholder">הדגמה חיה של איסוף נתוני תנועת עכבר או הצגת סטטיסטיקות אישיות יכולה להופיע כאן.</div>
+                     <button class="back-button" data-target-grid="modules-grid">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                        חזור
+                    </button>
+                </section>
+
+                <!-- תוכן מודול סגנון הקלדה -->
+                <section id="content-typing-recognition" class="module-content" aria-labelledby="typing-recognition-content-title" tabindex="-1">
+                    <h3 class="module-content__title" id="typing-recognition-content-title">מודול סגנון הקלדה</h3>
+                    <p class="module-content__description">אימות זהות על-פי הדרך הייחודית שבה אתה מקליד. המערכת מנתחת את קצב ההקלדה, משך הלחיצה על כל מקש, זמן המעבר בין מקשים, ותדירות תיקונים.</p>
+                    <div class="module-content__placeholder">ניתן לשלב כאן שדה טקסט לבדיקת סגנון ההקלדה, או גרפים המציגים את המאפיינים הייחודיים שלך.</div>
+                     <button class="back-button" data-target-grid="modules-grid">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                        חזור
+                    </button>
+                </section>
+            </div>
+
+        </main>
+        <footer class="site-footer">
+            <p>&copy; <span id="currentYear"></span> מערכת זיהוי. כל הזכויות שמורות. טכנולוגיה מובילה לפתרונות אימות. כל הזכויות שמורות שילה שוורץ.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('currentYear').textContent = new Date().getFullYear();
+            const moduleCards = document.querySelectorAll('.module-card:not(.disabled)');
+            const moduleContents = document.querySelectorAll('.module-content');
+            const backButtons = document.querySelectorAll('.back-button');
+            const body = document.body;
+            const modulesGrid = document.querySelector('.modules-grid'); 
+            
+            let lastFocusedCard = null;
+
+            const accentColorPrimary = getComputedStyle(document.documentElement).getPropertyValue('--accent-color-primary').trim();
+            if (accentColorPrimary) {
+                let r=0, g=0, b=0;
+                if (accentColorPrimary.startsWith('#')) {
+                    const hex = accentColorPrimary.substring(1);
+                    if (hex.length === 3) { 
+                        r = parseInt(hex[0] + hex[0], 16);
+                        g = parseInt(hex[1] + hex[1], 16);
+                        b = parseInt(hex[2] + hex[2], 16);
+                    } else if (hex.length === 6) { 
+                        r = parseInt(hex.substring(0,2), 16);
+                        g = parseInt(hex.substring(2,4), 16);
+                        b = parseInt(hex.substring(4,6), 16);
+                    }
+                }
+                document.documentElement.style.setProperty('--accent-color-primary-rgb', `${r}, ${g}, ${b}`);
+            }
+
+            const playSound = (soundId) => {
+                const sound = document.getElementById(soundId);
+                if (sound) {
+                    sound.currentTime = 0; 
+                    sound.play().catch(error => console.warn(`Could not play sound ${soundId}:`, error));
+                } else {
+                    console.warn(`Sound element with id "${soundId}" not found.`);
+                }
+            };
+            
+            document.querySelectorAll('.module-card:not(.disabled)').forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+                    card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+                });
+                 card.addEventListener('mouseleave', () => {
+                    card.style.removeProperty('--mouse-x');
+                    card.style.removeProperty('--mouse-y');
+                });
+            });
+
+            moduleCards.forEach(card => {
+                card.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    const targetId = card.dataset.target;
+                    const customLink = card.dataset.customLink;
+
+                    playSound('sound-card-click'); 
+
+                    if (customLink) {
+                        setTimeout(() => {
+                            window.location.href = customLink;
+                        }, 150); 
+                    } else if (targetId) {
+                        const targetContent = document.getElementById(targetId);
+                        if (targetContent) {
+                            lastFocusedCard = card; 
+                            
+                            moduleContents.forEach(content => {
+                                if (content.id !== targetId) content.classList.remove('active');
+                            });
+
+                            body.classList.add('module-view-active');
+                            
+                            setTimeout(() => {
+                                targetContent.classList.add('active');
+                                targetContent.focus(); 
+                                playSound('sound-content-show');
+                                const contentArea = document.querySelector('.module-content.active'); 
+                                if(contentArea) contentArea.scrollTo({ top: 0, behavior: 'smooth' });
+                                else window.scrollTo({ top: 0, behavior: 'smooth' }); 
+                            }, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration-medium') || '0.4s') * 1000);
+                        }
+                    }
+                });
+            });
+
+            backButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    playSound('sound-back-click');
+                    const parentContent = button.closest('.module-content');
+                    
+                    if (parentContent) {
+                        parentContent.classList.remove('active');
+                         setTimeout(() => {
+                            body.classList.remove('module-view-active');
+                            if (lastFocusedCard) {
+                                lastFocusedCard.focus(); 
+                            } else if (modulesGrid) {
+                                modulesGrid.querySelector('.module-card:not(.disabled)')?.focus(); 
+                            }
+                        }, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--transition-duration-long') || '0.5s') * 1000 * 0.8); 
+                    }
+                });
+            });
+            
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && body.classList.contains('module-view-active')) {
+                    const activeButton = document.querySelector('.module-content.active .back-button');
+                    if (activeButton) {
+                        activeButton.click();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>זיהוי קולי - מערכת זיהוי ביומטרי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D0F10; 
+            --card-bg: #1A1C1E; 
+            --input-bg: #2a2d30;
+            --accent-color: #03dac6; 
+            --accent-color-hover: #7fffd4; 
+            --border-color-base: #282a2c; 
+            --text-color-primary: #e8eaed; 
+            --text-color-secondary: #9aa0a6; 
+            --button-text-color: #0a0a0a;
+            --success-color: #38A169; 
+            --error-color: #E53E3E;   
+            --info-color: #00aeff; 
+            --loader-color: var(--accent-color);
+            --card-radius: 10px;
+            --spacing-unit: 16px; 
+            --shadow-base: 0 4px 10px rgba(0, 0, 0, 0.3);
+            --transition-speed: 0.25s;
+            --transition-ease: ease-out;
+        }
+
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-primary); background-color: var(--bg-color); color: var(--text-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            padding: var(--spacing-unit); 
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+        }
+
+        .app-container {
+            width: 100%; max-width: 800px; 
+            background-color: var(--card-bg);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-base);
+            border: 1px solid var(--border-color-base);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - (var(--spacing-unit) * 2)); 
+            position: relative;
+        }
+
+        header { text-align: center; margin-bottom: var(--spacing-unit); flex-shrink: 0; }
+        header h1 { font-size: 1.8em; font-weight: 600; margin: 0; }
+        .back-link {
+            position: absolute; top: calc(var(--spacing-unit)*1.2); right: calc(var(--spacing-unit)*1.2);
+            font-size: 0.8em; color: var(--accent-color); text-decoration: none;
+            font-weight: 500; transition: color 0.2s ease; display: flex; align-items: center;
+        }
+        .back-link:hover { color: var(--accent-color-hover); }
+        .back-link svg { width: 14px; height: 14px; margin-left: calc(var(--spacing-unit) * 0.4); fill: currentColor;}
+
+        .main-content {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.5); gap: var(--spacing-unit);
+        }
+        /* --- CSS SCROLLBAR FIX --- */
+        .main-content::-webkit-scrollbar { 
+            width: 5px; 
+        }
+        .main-content::-webkit-scrollbar-track { 
+            background: rgba(0,0,0,0.1); 
+            border-radius: 3px;
+        }
+        .main-content::-webkit-scrollbar-thumb { 
+            background: var(--border-color-base); 
+            border-radius: 3px;
+        }
+        .main-content::-webkit-scrollbar-thumb:hover { 
+            background: var(--accent-color); 
+        }
+        /* --- END CSS SCROLLBAR FIX --- */
+
+
+        .voice-module-section {
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 1); width: 100%; max-width: 480px; 
+        }
+        
+        #instructionText {
+            font-size: 0.95em; color: var(--text-color-secondary); margin-bottom: calc(var(--spacing-unit) * 0.5);
+            text-align: center;
+        }
+        #instructionText strong { color: var(--accent-color); }
+
+        #visualizerContainer {
+            width: 100%; height: 80px;
+            background-color: rgba(0,0,0,0.2); border-radius: var(--card-radius);
+            border: 1px solid var(--border-color-base);
+            margin-bottom: var(--spacing-unit);
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        #visualizerCanvas { display: block; width: 100%; height: 100%; }
+        
+        #statusMessage {
+            width: 100%; text-align: center; padding: calc(var(--spacing-unit) * 0.6);
+            border-radius: var(--card-radius); font-weight: 500; font-size: 0.85em;
+            min-height: calc(var(--spacing-unit) * 1.2 + 16px); background-color: rgba(0,0,0,0.2);
+            color: var(--text-color-secondary); border: 1px solid transparent;
+            transition: background-color var(--transition-speed) var(--transition-ease), color var(--transition-speed) var(--transition-ease), border-color var(--transition-speed) var(--transition-ease);
+        }
+        .status-success { background-color: rgba(56, 161, 105, 0.1); color: var(--success-color); border-color: var(--success-color); }
+        .status-error   { background-color: rgba(229, 62, 62, 0.1); color: var(--error-color); border-color: var(--error-color); }
+        .status-info    { background-color: rgba(0, 174, 255, 0.1); color: var(--info-color); border-color: var(--info-color); }
+
+        .actions-area {
+            display: grid; grid-template-columns: 1fr; 
+            gap: var(--spacing-unit); width: 100%; max-width: 700px; 
+            margin-top: var(--spacing-unit);
+        }
+        @media (min-width: 600px) { .actions-area { grid-template-columns: 1fr 1fr; } }
+
+        .action-group {
+            background-color: rgba(255,255,255,0.03); 
+            padding: calc(var(--spacing-unit) * 1.5); border-radius: var(--card-radius);
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); border: 1px solid var(--border-color-base);
+            min-height: 180px; justify-content: center; 
+        }
+        .action-group h2 { font-size: 1.2em; font-weight: 600; margin: 0 0 var(--spacing-unit) 0; color: var(--text-color-primary); }
+        
+        input[type="text"] {
+            background-color: var(--input-bg); border: 1px solid var(--border-color-base);
+            color: var(--text-color-primary); border-radius: var(--card-radius);
+            padding: calc(var(--spacing-unit) * 0.7); width: 100%; max-width: 220px;
+            text-align: center; font-size: 0.9em; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input[type="text"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(3, 218, 198, 0.2); }
+
+        .btn {
+            background-color: var(--accent-color); color: var(--button-text-color); border: none;
+            padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 1.8);
+            font-size: 0.9em; font-family: var(--font-primary); font-weight: 700;
+            border-radius: var(--card-radius); cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--spacing-unit) * 0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            min-width: 180px; /* Give buttons some consistent width */
+        }
+        .btn:hover:not(:disabled) { background-color: var(--accent-color-hover); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:disabled { background-color: var(--border-color-base); color: var(--text-color-secondary); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        
+        .loader-container { display: none; text-align: center; padding: var(--spacing-unit); position: absolute; top:50%; left:50%; transform: translate(-50%,-50%); z-index: 10;}
+        .loader { border: 4px solid rgba(220, 220, 220, 0.15); border-left-color: var(--loader-color); border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto var(--spacing-unit) auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #loadingStatus { font-size: 0.9em; color: var(--text-color-secondary); }
+
+        .results-output { font-size: 0.9em; color: var(--text-color-primary); text-align: center; min-height: calc(var(--spacing-unit) * 1.5); margin-top:var(--spacing-unit); }
+        .results-output strong { color: var(--accent-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <a href="mainPage.html" class="back-link">
+             חזרה <svg viewBox="0 0 20 20"><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+        </a>
+        <header><h1>זיהוי קולי</h1></header>
+
+        <div class="loader-container" id="loaderContainer"><div class="loader"></div><p id="loadingStatus">טוען...</p></div>
+        
+        <div class="main-content" id="mainContentWrapper">
+            <div class="voice-module-section">
+                <p id="instructionText">אמור את המשפט: "<strong>הקול שלי הוא הסיסמה שלי</strong>" בבירור.</p>
+                <div id="visualizerContainer">
+                    <canvas id="visualizerCanvas"></canvas>
+                </div>
+                <div id="statusMessage" class="status-display">המתן להוראות...</div>
+            </div>
+            <div class="actions-area">
+                <div class="action-group">
+                    <h2>הוספה למאגר</h2>
+                    <input type="text" id="personName" placeholder="שם מלא">
+                    <button id="startRegistrationButton" class="btn">הקלט חתימת קול</button>
+                </div>
+                <div class="action-group">
+                    <h2>אימות קולי</h2>
+                    <button id="startVerificationButton" class="btn">בצע אימות קולי</button>
+                    <div class="results-output" id="verificationResults"></div>
+                </div>
+            </div>
+        </div> 
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const personNameInput = document.getElementById('personName');
+            const startRegistrationButton = document.getElementById('startRegistrationButton');
+            const startVerificationButton = document.getElementById('startVerificationButton');
+            const statusMessage = document.getElementById('statusMessage');
+            const verificationResults = document.getElementById('verificationResults');
+            // const loaderContainer = document.getElementById('loaderContainer'); // Not used currently, but kept for future
+            // const mainContentWrapper = document.getElementById('mainContentWrapper'); // Not used currently
+            const instructionText = document.getElementById('instructionText'); // Not used currently for dynamic text
+            const PASS_PHRASE = "הקול שלי הוא הסיסמה שלי";
+
+            const visualizerCanvas = document.getElementById('visualizerCanvas');
+            const visualizerCtx = visualizerCanvas.getContext('2d');
+
+            let audioContext;
+            let analyser;
+            let mediaStreamSource;
+            let audioChunks = []; // Kept if direct recording to blob is desired later
+            let recordedSignatures = []; 
+            let currentSignature = null;
+            let isRecording = false;
+            let recordingTimeout;
+            let animationFrameId;
+
+            const RECORDING_DURATION = 3500;
+            const FFT_SIZE = 2048;
+            const NUM_SIGNATURE_BANDS = 32;
+            const SIMILARITY_THRESHOLD = 0.85; 
+
+            function initializeApp() {
+                showStatus('מוכן להתחיל. אשר שימוש במיקרופון בעת הצורך.', 'info');
+                loadSignaturesFromDB();
+                setupVisualizer();
+                updateUIState();
+            }
+            
+            function setupVisualizer() {
+                visualizerCanvas.width = visualizerContainer.clientWidth;
+                visualizerCanvas.height = visualizerContainer.clientHeight;
+                clearVisualizer();
+            }
+
+            function clearVisualizer() {
+                if (!visualizerCtx) return;
+                visualizerCtx.fillStyle = 'rgba(26, 28, 30, 0.5)';
+                visualizerCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+            }
+
+            function drawVisualizer(dataArray) {
+                if (!visualizerCtx) return;
+                clearVisualizer();
+                const barWidth = (visualizerCanvas.width / dataArray.length) * 2.5;
+                let x = 0;
+                visualizerCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
+
+                for (let i = 0; i < dataArray.length; i++) {
+                    const barHeight = (dataArray[i] / 255) * visualizerCanvas.height;
+                    visualizerCtx.fillRect(x, visualizerCanvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+            }
+            
+            function visualize() {
+                if (!isRecording || !analyser) {
+                    clearVisualizer();
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    return;
+                }
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(dataArray);
+                drawVisualizer(dataArray);
+                animationFrameId = requestAnimationFrame(visualize);
+            }
+
+            async function requestMicrophonePermission() {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    showStatus('API המדיה אינו נתמך בדפדפן זה.', 'error');
+                    return null;
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    return stream;
+                } catch (err) {
+                    console.error("Error accessing microphone:", err);
+                    let message = 'שגיאה בגישה למיקרופון.';
+                    if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") message = 'הגישה למיקרופון נדחתה. אנא אפשר גישה בהגדרות הדפדפן.';
+                    else if (err.name === "NotFoundError") message = 'לא נמצא מיקרופון.';
+                    showStatus(message, 'error');
+                    return null;
+                }
+            }
+
+            async function startRecording(type) { 
+                if (isRecording) return;
+
+                isRecording = true;
+                updateUIState(); 
+                showStatus(`מנסה להפעיל מיקרופון...`, 'info');
+                verificationResults.innerHTML = ''; 
+
+                const stream = await requestMicrophonePermission();
+                if (!stream) {
+                    isRecording = false; 
+                    updateUIState();   
+                    return;
+                }
+                
+                showStatus(`הקלטה החלה... אמור: "${PASS_PHRASE}"`, 'info');
+                
+                currentSignature = null; 
+                audioChunks = []; 
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') {
+                    try { await audioContext.resume(); } catch(e) { console.warn("Could not resume audio context", e); }
+                }
+
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = FFT_SIZE;
+                mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                mediaStreamSource.connect(analyser);
+                
+                const signatureDataCollector = [];
+                const collectInterval = 100; 
+                
+                const dataCollectionIntervalId = setInterval(() => {
+                    if (!isRecording) { 
+                        clearInterval(dataCollectionIntervalId);
+                        return;
+                    }
+                    const freqData = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(freqData);
+                    signatureDataCollector.push(Array.from(freqData)); 
+                }, collectInterval);
+
+                visualize(); 
+
+                recordingTimeout = setTimeout(() => {
+                    stopRecording(type, stream, dataCollectionIntervalId, signatureDataCollector);
+                }, RECORDING_DURATION);
+            }
+
+            function stopRecording(type, stream, dataCollectionIntervalId, signatureDataCollector) {
+                if (!isRecording && !stream) return; // Already stopped or never started properly
+
+                clearTimeout(recordingTimeout);
+                if (dataCollectionIntervalId) clearInterval(dataCollectionIntervalId);
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                
+                isRecording = false; 
+
+                if (stream) { 
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                if (mediaStreamSource) {
+                    try { mediaStreamSource.disconnect(); } catch(e) {/* ignore */}
+                    mediaStreamSource = null;
+                }
+                if (analyser) {
+                     try { analyser.disconnect(); } catch(e) {/* ignore */}
+                    analyser = null;
+                }
+                if (audioContext && audioContext.state !== 'closed') {
+                    audioContext.close().catch(e => console.warn("Error closing audio context:", e));
+                }
+                audioContext = null;
+                
+                clearVisualizer(); 
+                showStatus('הקלטה הסתיימה, מעבד נתונים...', 'info');
+                updateUIState(); 
+
+                setTimeout(() => { 
+                    processAndHandleSignature(type, signatureDataCollector);
+                }, 50); // Small delay to allow UI to update
+            }
+
+            function processAndHandleSignature(type, signatureDataCollector) {
+                if (!signatureDataCollector || signatureDataCollector.length === 0) {
+                    showStatus('לא נקלט אודיו משמעותי במהלך ההקלטה.', 'error');
+                    currentSignature = null;
+                    return;
+                }
+                
+                const numFrames = signatureDataCollector.length;
+                if (numFrames === 0) { // Should be caught by above, but defensive
+                     showStatus('לא נקלטו נתונים לעיבוד.', 'error');
+                     return;
+                }
+                const frameLength = signatureDataCollector[0].length;
+                const bandSize = Math.floor(frameLength / NUM_SIGNATURE_BANDS);
+                const signature = new Array(NUM_SIGNATURE_BANDS).fill(0);
+
+                for (let i = 0; i < NUM_SIGNATURE_BANDS; i++) {
+                    let bandSum = 0;
+                    for (let j = 0; j < numFrames; j++) {
+                        let frameBandSum = 0;
+                        let samplesInBand = 0;
+                        for (let k = 0; k < bandSize; k++) {
+                            const indexInFrame = i * bandSize + k;
+                            if (indexInFrame < frameLength) {
+                                frameBandSum += signatureDataCollector[j][indexInFrame];
+                                samplesInBand++;
+                            }
+                        }
+                        if (samplesInBand > 0) bandSum += (frameBandSum / samplesInBand); 
+                    }
+                    if (numFrames > 0) signature[i] = bandSum / numFrames; 
+                }
+                currentSignature = signature;
+
+                if (type === 'registration') {
+                    const name = personNameInput.value.trim();
+                    if (!name) {
+                        showStatus('אנא הזן שם עבור החתימה.', 'error');
+                        currentSignature = null; 
+                        return;
+                    }
+                    if (recordedSignatures.find(entry => entry.name === name)) {
+                         showStatus(`שם '${name}' כבר קיים במאגר. בחר שם אחר.`, 'error');
+                         currentSignature = null;
+                         return;
+                    }
+                    recordedSignatures.push({ name, signature: currentSignature });
+                    saveSignaturesToDB();
+                    showStatus(`חתימת קול עבור <strong>${name}</strong> נשמרה בהצלחה!`, 'success');
+                    personNameInput.value = '';
+                } else if (type === 'verification') {
+                    verifySignature(currentSignature);
+                }
+            }
+
+            function verifySignature(newSignature) {
+                if (!newSignature || newSignature.length === 0) {
+                    verificationResults.innerHTML = 'לא נוצרה חתימה לאימות.';
+                    showStatus('אימות נכשל - לא נוצרה חתימה.', 'error');
+                    return;
+                }
+                if (recordedSignatures.length === 0) {
+                    verificationResults.innerHTML = 'המאגר ריק. יש להוסיף חתימות קול תחילה.';
+                    showStatus('לא ניתן לאמת - מאגר החתימות ריק.', 'info');
+                    return;
+                }
+
+                let bestMatch = null;
+                let maxSimilarity = -1;
+
+                // --- JS SYNTAX FIX: const-entry to const entry ---
+                for (const entry of recordedSignatures) { 
+                    const similarity = calculateCosineSimilarity(newSignature, entry.signature);
+                    if (similarity > maxSimilarity) {
+                        maxSimilarity = similarity;
+                        bestMatch = entry;
+                    }
+                }
+                
+                if (bestMatch && maxSimilarity >= SIMILARITY_THRESHOLD) {
+                    verificationResults.innerHTML = `זיהוי הצליח: <strong>${bestMatch.name}</strong> (דמיון: ${maxSimilarity.toFixed(3)})`;
+                    showStatus('אימות הושלם - זוהתה התאמה.', 'success');
+                } else if (bestMatch) {
+                     verificationResults.innerHTML = `לא זוהתה התאמה ודאית. הקרוב ביותר: ${bestMatch.name} (דמיון: ${maxSimilarity.toFixed(3)})`;
+                     showStatus('אימות הושלם - לא נמצאה התאמה מספקת.', 'info');
+                }
+                else { // Should not happen if recordedSignatures is not empty and newSignature is valid
+                    verificationResults.innerHTML = 'לא נמצאה התאמה במאגר.';
+                    showStatus('אימות הושלם - לא נמצאה התאמה.', 'info');
+                }
+            }
+
+            function calculateCosineSimilarity(vecA, vecB) {
+                if (!vecA || !vecB || vecA.length !== vecB.length || vecA.length === 0) return 0;
+                let dotProduct = 0;
+                let normA = 0;
+                let normB = 0;
+                for (let i = 0; i < vecA.length; i++) {
+                    dotProduct += vecA[i] * vecB[i];
+                    normA += vecA[i] * vecA[i];
+                    normB += vecB[i] * vecB[i];
+                }
+                if (normA === 0 || normB === 0) return 0;
+                return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+            }
+
+            function showStatus(message, type = 'info') {
+                statusMessage.innerHTML = message;
+                statusMessage.className = `status-display status-${type}`;
+            }
+            
+            function updateUIState() {
+                const disableButtons = isRecording;
+                startRegistrationButton.disabled = disableButtons;
+                startVerificationButton.disabled = disableButtons;
+                personNameInput.disabled = disableButtons;
+
+                if (isRecording) {
+                    startRegistrationButton.textContent = "מקליט...";
+                    startVerificationButton.textContent = "מקליט...";
+                } else {
+                    startRegistrationButton.textContent = "הקלט חתימת קול";
+                    startVerificationButton.textContent = "בצע אימות קולי";
+                }
+            }
+
+            function saveSignaturesToDB() {
+                try {
+                    localStorage.setItem('voiceSignaturesDB', JSON.stringify(recordedSignatures));
+                } catch (e) {
+                    console.error("Error saving to DB:", e);
+                    showStatus("שגיאה בשמירה ל-localStorage.", "error");
+                }
+            }
+
+            function loadSignaturesFromDB() {
+                const data = localStorage.getItem('voiceSignaturesDB');
+                if (data) {
+                    try {
+                        const parsedData = JSON.parse(data);
+                        if (Array.isArray(parsedData)) {
+                           recordedSignatures = parsedData;
+                        } else {
+                           recordedSignatures = [];
+                        }
+                    } catch (e) {
+                        console.error("Error parsing data from DB", e);
+                        showStatus('שגיאה בטעינת מאגר החתימות. המאגר אופס.', 'error');
+                        localStorage.removeItem('voiceSignaturesDB');
+                        recordedSignatures = [];
+                    }
+                }
+            }
+
+            startRegistrationButton.addEventListener('click', () => {
+                if (isRecording) return;
+                const name = personNameInput.value.trim();
+                if (!name) { 
+                    showStatus('אנא הזן שם לפני הקלטת חתימה.', 'error');
+                    personNameInput.focus();
+                    return;
+                }
+                if (recordedSignatures.find(entry => entry.name === name)) {
+                     showStatus(`שם '${name}' כבר קיים במאגר. בחר שם אחר.`, 'error');
+                     personNameInput.focus();
+                     return;
+                }
+                startRecording('registration');
+            });
+
+            startVerificationButton.addEventListener('click', () => {
+                if (isRecording) return;
+                startRecording('verification');
+            });
+            
+            window.addEventListener('resize', setupVisualizer);
+
+            initializeApp();
+        });
+    </script>
+</body>
+</html>

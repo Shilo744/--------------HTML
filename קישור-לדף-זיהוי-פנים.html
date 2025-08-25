@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>זיהוי פנים - מערכת זיהוי ביומטרי</title>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <style>
+        :root {
+            /* פלטת צבעים עקבית עם הדף הראשי */
+            --font-primary: 'Assistant', sans-serif;
+            --bg-color: #0D0F10; 
+            --card-bg: #1A1C1E; 
+            --input-bg: #2a2d30; /* מעט בהיר יותר לאינפוט */
+            --accent-color: #03dac6; 
+            --accent-color-hover: #7fffd4; 
+            --border-color-base: #282a2c; 
+            --text-color-primary: #e8eaed; 
+            --text-color-secondary: #9aa0a6; 
+            --button-text-color: #0a0a0a;
+            --success-color: #38A169; 
+            --error-color: #E53E3E;   
+            --info-color: #00aeff; 
+            --loader-color: var(--accent-color);
+            --card-radius: 10px;
+            --spacing-unit: 16px; 
+            --shadow-base: 0 4px 10px rgba(0, 0, 0, 0.3);
+            --transition-speed: 0.25s;
+            --transition-ease: ease-out;
+        }
+
+        html, body { height: 100%; margin: 0; overflow: hidden; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-primary); background-color: var(--bg-color); color: var(--text-color-primary);
+            display: flex; align-items: center; justify-content: center;
+            padding: var(--spacing-unit); 
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+        }
+
+        .app-container {
+            width: 100%; max-width: 800px; 
+            background-color: var(--card-bg);
+            padding: calc(var(--spacing-unit) * 1.5);
+            border-radius: var(--card-radius);
+            box-shadow: var(--shadow-base);
+            border: 1px solid var(--border-color-base);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - (var(--spacing-unit) * 2)); 
+            position: relative;
+        }
+
+        header { text-align: center; margin-bottom: var(--spacing-unit); flex-shrink: 0; }
+        header h1 { font-size: 1.8em; font-weight: 600; margin: 0; }
+        .back-link {
+            position: absolute; top: calc(var(--spacing-unit)*1.2); right: calc(var(--spacing-unit)*1.2);
+            font-size: 0.8em; color: var(--accent-color); text-decoration: none;
+            font-weight: 500; transition: color 0.2s ease; display: flex; align-items: center;
+        }
+        .back-link:hover { color: var(--accent-color-hover); }
+        .back-link svg { width: 14px; height: 14px; margin-left: calc(var(--spacing-unit) * 0.4); fill: currentColor;}
+
+        .main-content {
+            flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
+            padding: calc(var(--spacing-unit) * 0.5); gap: var(--spacing-unit);
+            &::-webkit-scrollbar { width: 5px; }
+            &::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 3px;}
+            &::-webkit-scrollbar-thumb { background: var(--border-color-base); border-radius: 3px;}
+            &::-webkit-scrollbar-thumb:hover { background: var(--accent-color); }
+        }
+
+        .video-section {
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); width: 100%; max-width: 360px; 
+        }
+        .video-container {
+            position: relative; width: 100%; aspect-ratio: 4 / 3;
+            background-color: #000; border-radius: var(--card-radius); overflow: hidden;
+            border: 1px solid var(--border-color-base); box-shadow: var(--shadow-base);
+        }
+        #videoFeed, #overlayCanvas { display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        #overlayCanvas { position: absolute; top: 0; left: 0; }
+        
+        #statusMessage {
+            width: 100%; text-align: center; padding: calc(var(--spacing-unit) * 0.6);
+            border-radius: var(--card-radius); font-weight: 500; font-size: 0.85em;
+            min-height: calc(var(--spacing-unit) * 1.2 + 16px); background-color: rgba(0,0,0,0.2);
+            color: var(--text-color-secondary); border: 1px solid transparent;
+        }
+        .status-success { background-color: rgba(56, 161, 105, 0.1); color: var(--success-color); border-color: var(--success-color); }
+        .status-error   { background-color: rgba(229, 62, 62, 0.1); color: var(--error-color); border-color: var(--error-color); }
+        .status-info    { background-color: rgba(0, 174, 255, 0.1); color: var(--info-color); border-color: var(--info-color); }
+
+        .actions-area {
+            display: grid; grid-template-columns: 1fr; 
+            gap: var(--spacing-unit); width: 100%; max-width: 700px; 
+            margin-top: var(--spacing-unit);
+        }
+        @media (min-width: 600px) { .actions-area { grid-template-columns: 1fr 1fr; } }
+
+        .action-group {
+            background-color: rgba(255,255,255,0.03); 
+            padding: calc(var(--spacing-unit) * 1.5); border-radius: var(--card-radius);
+            display: flex; flex-direction: column; align-items: center;
+            gap: calc(var(--spacing-unit) * 0.8); border: 1px solid var(--border-color-base);
+            min-height: 180px; justify-content: center; 
+        }
+        .action-group h2 { font-size: 1.2em; font-weight: 600; margin: 0 0 var(--spacing-unit) 0; color: var(--text-color-primary); }
+        
+        input[type="text"] {
+            background-color: var(--input-bg); border: 1px solid var(--border-color-base);
+            color: var(--text-color-primary); border-radius: var(--card-radius);
+            padding: calc(var(--spacing-unit) * 0.7); width: 100%; max-width: 220px;
+            text-align: center; font-size: 0.9em; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input[type="text"]:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(3, 218, 198, 0.2); }
+
+        .btn {
+            background-color: var(--accent-color); color: var(--button-text-color); border: none;
+            padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 1.8);
+            font-size: 0.9em; font-family: var(--font-primary); font-weight: 700;
+            border-radius: var(--card-radius); cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+            display: inline-flex; align-items: center; gap: calc(var(--spacing-unit) * 0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .btn:hover:not(:disabled) { background-color: var(--accent-color-hover); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .btn:active:not(:disabled) { transform: translateY(0px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn:disabled { background-color: var(--border-color-base); color: var(--text-color-secondary); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        .btn-secondary { background-color: transparent; color: var(--text-color-secondary); border: 1px solid var(--border-color-base); box-shadow: none; }
+        .btn-secondary:hover:not(:disabled) { background-color: rgba(255,255,255,0.05); color: var(--text-color-primary); border-color: var(--text-color-secondary); }
+        .btn-secondary.active { background-color: var(--accent-color); color: var(--button-text-color); border-color: var(--accent-color); }
+        .btn-secondary.active:hover:not(:disabled) { background-color: var(--accent-color-hover); }
+
+        .loader-container { display: none; text-align: center; padding: var(--spacing-unit); position: absolute; top:50%; left:50%; transform: translate(-50%,-50%); z-index: 10;}
+        .loader { border: 4px solid rgba(220, 220, 220, 0.15); border-left-color: var(--loader-color); border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto var(--spacing-unit) auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #loadingStatus { font-size: 0.9em; color: var(--text-color-secondary); }
+
+        .results-output { font-size: 0.9em; color: var(--text-color-primary); text-align: center; min-height: calc(var(--spacing-unit) * 2.5); margin-top:var(--spacing-unit); }
+        .results-output strong { color: var(--accent-color); }
+
+        #startCameraButton.hidden { display: none; }
+
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <a href="mainPage.html" class="back-link">
+             חזרה <svg viewBox="0 0 20 20"><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg>
+        </a>
+        <header><h1>זיהוי פנים</h1></header>
+
+        <div class="loader-container" id="loaderContainer"><div class="loader"></div><p id="loadingStatus">טוען מודלים...</p></div>
+        
+        <div class="main-content" id="mainContentWrapper" style="display:none;">
+            <div class="video-section">
+                <div class="video-container"><video id="videoFeed" autoplay muted playsinline></video><canvas id="overlayCanvas"></canvas></div>
+                <div id="statusMessage" class="status-display"></div>
+                <button id="startCameraButton" class="btn btn-secondary"><span class="btn-text">הפעל מצלמה</span></button>
+            </div>
+            <div class="actions-area">
+                <div class="action-group">
+                    <h2>הוספה למאגר</h2>
+                    <input type="text" id="personName" placeholder="שם מלא">
+                    <button id="addFaceButton" class="btn" disabled>הוסף למאגר</button>
+                </div>
+                <div class="action-group">
+                    <h2>חיפוש במאגר</h2>
+                    <button id="searchFaceButton" class="btn" disabled>בצע חיפוש</button>
+                    <div class="results-output" id="searchResults"></div>
+                </div>
+            </div>
+        </div> 
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const video = document.getElementById('videoFeed');
+            const overlayCanvas = document.getElementById('overlayCanvas');
+            const overlayCtx = overlayCanvas.getContext('2d');
+            const personNameInput = document.getElementById('personName');
+            const addFaceButton = document.getElementById('addFaceButton');
+            const searchFaceButton = document.getElementById('searchFaceButton');
+            const startCameraButton = document.getElementById('startCameraButton');
+            const startCameraButtonText = startCameraButton.querySelector('.btn-text'); 
+            const statusMessage = document.getElementById('statusMessage');
+            const searchResults = document.getElementById('searchResults');
+            const loaderContainer = document.getElementById('loaderContainer');
+            const loadingStatus = document.getElementById('loadingStatus');
+            const mainContentWrapper = document.getElementById('mainContentWrapper');
+
+            const MODELS_URL = './weights'; 
+            
+            let faceMatcher = null;
+            let labeledFaceDescriptors = [];
+            let stream = null;
+            let detectionInterval = null;
+
+            function initializeUIState() {
+                stopCamera(); 
+                startCameraButtonText.textContent = 'הפעל מצלמה'; 
+                startCameraButton.classList.add('btn-secondary'); 
+                startCameraButton.classList.remove('active'); 
+                startCameraButton.classList.remove('hidden'); 
+                enableActionButtons(false); 
+                searchResults.innerHTML = ''; 
+                statusMessage.innerHTML = 'לחץ "הפעל מצלמה" כדי להתחיל.'; 
+                statusMessage.className = 'status-display status-info'; 
+                personNameInput.value = ''; 
+            }
+
+            async function loadModelsAndInit() {
+                loaderContainer.style.display = 'block';
+                mainContentWrapper.style.display = 'none';
+                initializeUIState(); 
+                
+                try {
+                    if (typeof faceapi === 'undefined') {
+                        await new Promise(resolve => setTimeout(resolve, 500)); 
+                        if (typeof faceapi === 'undefined') throw new Error('face-api.js library not loaded.');
+                    }
+                    loadingStatus.textContent = 'טוען מודלים...'; 
+                    await Promise.all([ 
+                        faceapi.nets.ssdMobilenetv1.loadFromUri(MODELS_URL),
+                        faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL),
+                        faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL)
+                    ]);
+                    
+                    loaderContainer.style.display = 'none';
+                    mainContentWrapper.style.display = 'flex';
+                    loadLabeledImagesFromDB(); 
+                    attemptAutoStartCamera();
+                } catch (error) {
+                    console.error("Full error details during model loading:", error);
+                    loadingStatus.innerHTML = `שגיאה בטעינת המודלים: ${error.message}.`;
+                    showStatus(`שגיאה בטעינת המודלים: ${error.message}.`, 'error');
+                    mainContentWrapper.style.display = 'none';
+                    startCameraButton.classList.remove('hidden');
+                }
+            }
+            
+            async function attemptAutoStartCamera() {
+                showStatus('מנסה להפעיל מצלמה...', 'info');
+                try {
+                    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                    handleStream(s);
+                } catch (err) {
+                    console.warn("Could not auto-start camera:", err.name, err.message);
+                    showStatus('יש לאשר שימוש במצלמה, או ללחוץ "הפעל מצלמה".', 'info');
+                    startCameraButton.classList.remove('hidden');
+                    enableActionButtons(false);
+                }
+            }
+
+            function startCamera() {
+                if (stream) { stopCamera(); } 
+                else {
+                    showStatus('מפעיל מצלמה...', 'info');
+                    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+                        .then(handleStream)
+                        .catch(handleStreamError);
+                }
+            }
+
+            function handleStream(s) {
+                stream = s;
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    overlayCanvas.width = video.videoWidth;
+                    overlayCanvas.height = video.videoHeight;
+                    startCameraButtonText.textContent = 'כבה מצלמה'; 
+                    startCameraButton.classList.remove('btn-secondary'); 
+                    startCameraButton.classList.add('active'); 
+                    startCameraButton.classList.remove('hidden');
+                    enableActionButtons(true);
+                    showStatus('מצלמה הופעלה.', 'success');
+                    searchResults.innerHTML = ''; 
+                    startFaceDetection();
+                }
+            }
+            function handleStreamError(err){
+                console.error("Error accessing camera:", err);
+                let message = 'שגיאה בגישה למצלמה.';
+                if (err.name === "NotAllowedError") message = 'הגישה למצלמה נדחתה.';
+                else if (err.name === "NotFoundError") message = 'לא נמצאה מצלמה.';
+                showStatus(message, 'error');
+                enableActionButtons(false);
+                startCameraButtonText.textContent = 'הפעל מצלמה'; 
+                startCameraButton.classList.add('btn-secondary'); 
+                startCameraButton.classList.remove('active');
+                startCameraButton.classList.remove('hidden');
+            }
+
+            function stopCamera() {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    video.srcObject = null; stream = null;
+                    startCameraButtonText.textContent = 'הפעל מצלמה'; 
+                    startCameraButton.classList.add('btn-secondary'); 
+                    startCameraButton.classList.remove('active');
+                    enableActionButtons(false);
+                    if(!loaderContainer.style.display || loaderContainer.style.display === 'none'){ 
+                        showStatus('מצלמה כובתה. לחץ "הפעל מצלמה".', 'info');
+                    }
+                    if (detectionInterval) clearInterval(detectionInterval);
+                    if(overlayCtx) overlayCtx.clearRect(0,0, overlayCanvas.width, overlayCanvas.height);
+                    searchResults.innerHTML = ''; // נקה תוצאות בכיבוי
+                }
+            }
+
+            function enableActionButtons(enable) { addFaceButton.disabled = !enable; searchFaceButton.disabled = !enable; }
+            function showStatus(message, type = 'info') { statusMessage.innerHTML = message; statusMessage.className = `status-display status-${type}`; }
+            function startFaceDetection() { if (detectionInterval) clearInterval(detectionInterval); detectionInterval = setInterval(async () => { if (!stream || video.paused || video.ended || typeof faceapi === 'undefined' || !faceapi.nets.ssdMobilenetv1.isLoaded) return; const detections = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 })).withFaceLandmarks(); if(overlayCtx) overlayCtx.clearRect(0,0, overlayCanvas.width, overlayCanvas.height); if (detections && detections.length > 0 && overlayCtx) { const resizedDetections = faceapi.resizeResults(detections, { width: overlayCanvas.width, height: overlayCanvas.height }); faceapi.draw.drawDetections(overlayCanvas, resizedDetections); } }, 300); }
+            async function captureFaceDescriptor() { if (!stream) { showStatus('המצלמה אינה פעילה.', 'error'); return null; } if (typeof faceapi === 'undefined') { showStatus('FaceAPI לא נטען כראוי.', 'error'); return null; } const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 })).withFaceLandmarks().withFaceDescriptor(); if (!detection) { showStatus('לא זוהו פנים ברורים.', 'error'); return null;} return detection.descriptor; }
+            
+            async function handleAddFace() { 
+                const name = personNameInput.value.trim(); 
+                if (!name) { showStatus('אנא הזן שם.', 'error'); return; } 
+                showStatus('מעבד...', 'info'); 
+                const originalButtonState = addFaceButton.disabled; addFaceButton.disabled = true; 
+                const descriptor = await captureFaceDescriptor(); 
+                if (descriptor) { 
+                    const existingEntry = labeledFaceDescriptors.find(entry => entry.label === name); 
+                    if(existingEntry){ showStatus(`השם '${name}' כבר קיים.`, 'error'); addFaceButton.disabled = !stream; return; } 
+                    labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(name, [descriptor])); 
+                    saveToDB(); updateFaceMatcher(); personNameInput.value = ''; 
+                    showStatus(`${name} נוספו למאגר!`, 'success'); 
+                } else {
+                     // הודעת שגיאה מ-captureFaceDescriptor, אבל צריך לעדכן סטטוס כללי
+                     showStatus('הוספה נכשלה - לא זוהו פנים.', 'error');
+                }
+                addFaceButton.disabled = !stream; 
+            }
+
+            // --- פונקציית החיפוש המתוקנת ---
+            async function handleSearchFace() {
+                searchResults.innerHTML = ''; // נקה תוצאה קודמת לפני חיפוש חדש
+                if (!faceMatcher) {
+                    showStatus('המאגר ריק או לא נטען.', 'error');
+                    return;
+                }
+                showStatus('מחפש במאגר...', 'info'); // הצג הודעת "מחפש"
+                searchFaceButton.disabled = true;
+                
+                const descriptor = await captureFaceDescriptor();
+                
+                if (descriptor) {
+                    const bestMatch = faceMatcher.findBestMatch(descriptor);
+                    if (bestMatch && bestMatch.label !== 'unknown' && bestMatch.distance < 0.55) {
+                        searchResults.innerHTML = `התאמה: <strong>${bestMatch.label}</strong><br>(דמיון: ${((1 - bestMatch.distance) * 100).toFixed(1)}%)`;
+                        showStatus('החיפוש הושלם.', 'success'); // **תיקון: עדכן סטטוס אחרי מציאת התאמה**
+                    } else {
+                        searchResults.innerHTML = 'לא נמצאה התאמה במאגר.';
+                        showStatus('החיפוש הושלם - לא נמצאה התאמה.', 'info'); // **תיקון: עדכן סטטוס כשלא נמצאה התאמה**
+                    }
+                } else {
+                    // הודעה על "לא זוהו פנים" כבר מוצגת על ידי captureFaceDescriptor
+                    searchResults.innerHTML = ''; // ודא שאזור התוצאות ריק
+                    showStatus('החיפוש הופסק - לא זוהו פנים.', 'info'); // **תיקון: עדכן סטטוס אם לא זוהו פנים**
+                }
+                searchFaceButton.disabled = !stream; // אפשר מחדש רק אם המצלמה פעילה
+            }
+            // --- סוף פונקציית החיפוש המתוקנת ---
+
+            function saveToDB() { try { const dataToSave = labeledFaceDescriptors.map(lfd => ({ label: lfd.label, descriptors: lfd.descriptors.map(d => Array.from(d)) })); localStorage.setItem('faceRecognitionDB', JSON.stringify(dataToSave)); } catch (e) { console.error("Error saving to DB:", e); showStatus("שגיאה בשמירה.", "error"); }}
+            function loadLabeledImagesFromDB() { const data = localStorage.getItem('faceRecognitionDB'); if (data) { try { const parsedData = JSON.parse(data); if (parsedData && Array.isArray(parsedData) && typeof faceapi !== 'undefined') { labeledFaceDescriptors = parsedData.map(item => new faceapi.LabeledFaceDescriptors(item.label, item.descriptors.map(d => new Float32Array(d)))); updateFaceMatcher(); /* הודעת סטטוס תטופל אחרי ניסיון הפעלת מצלמה */ } else { throw new Error("Invalid data or faceapi not ready for DB."); } } catch(e) { console.error("Error parsing data from DB", e); showStatus('שגיאה בטעינת מאגר. המאגר אופס.', 'error'); localStorage.removeItem('faceRecognitionDB'); labeledFaceDescriptors = []; updateFaceMatcher(); } } else { /* סטטוס ראשוני יטופל */ } }
+            function updateFaceMatcher() { if (labeledFaceDescriptors.length > 0 && typeof faceapi !== 'undefined') { faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55); } else { faceMatcher = null; } }
+
+            startCameraButton.addEventListener('click', startCamera);
+            addFaceButton.addEventListener('click', handleAddFace);
+            searchFaceButton.addEventListener('click', handleSearchFace);
+
+            loadModelsAndInit();
+        });
+    </script>
+</body>
+</html>
